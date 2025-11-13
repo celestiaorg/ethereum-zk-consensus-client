@@ -22,6 +22,30 @@ support Risc0 by ignoring the versioning.
 For generic (non-ZKVM) Groth16 proofs, we will have to extend the implementation to handle cases where there is just one verifying key and call the 
 Groth16 verifier directly. However it seems likely that most ZK light client that we will integrate use SP1, Risc0 or another ZKVM that has a dual verifying-key requirement.
 
+## Implementation
+
+### Binary Flow
+
+```mermaid
+    sequenceDiagram;
+        Client->>Module: submit MsgCreateStateTransitionVerifier with initial trusted state bytes;
+        Circuit->>Client: generate a state transition proof from trusted state to new trusted state;
+        Client->>Module: submit MsgUpdateStateTransitionVerifier with new trusted state;
+        Module->>SP1 Verifier: Verify proof and update trusted state;
+```
+
+
+### Types
+
+```
+MsgUpdateStateTransitionVerifier:
+    public_outputs = length_prefix || trusted_state || new_trusted_state
+```
+
+The length_prefix is the little-endian encoded u64 length of trusted_state. The length
+of new_trusted_state is arbitrary, but will usually match that of trusted_state.
+
+In the verifier module we store only new_trusted_state after verifying the proof against the current trusted_state (which is initally set when submitting MsgCreateStateTransitionVerifier).
 
 ## Instructions to run the POC
 
