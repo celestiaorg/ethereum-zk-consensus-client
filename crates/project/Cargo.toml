@@ -1,0 +1,17 @@
+[package]
+name = "project"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sp1-sdk.workspace = true
+types.workspace = true
+celestia-grpc.workspace = true
+prost.workspace = true
+bincode.workspace = true
+hex.workspace = true
+tokio.workspace = true
+rustls = "0.23.31"
+
+[build-dependencies]
+sp1-build = "=5.2.2"

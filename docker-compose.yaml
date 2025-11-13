@@ -1,0 +1,43 @@
+services:
+  celestia-init:
+    image: celestia-app-standalone:local
+    container_name: celestia-init
+    entrypoint: /scripts/init.sh
+    volumes:
+      - ./testnet/celestia-app/init.sh:/scripts/init.sh:ro
+      - celestia-app:/home/celestia/.celestia-app
+    restart: "no"
+
+  celestia-validator:
+    image: celestia-app-standalone:local
+    container_name: celestia-validator
+    ports:
+      - "26656:26656"
+      - "26657:26657"
+      - "1317:1317"
+      - "9090:9090"
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "bh=$(curl -sf http://localhost:26657/status | jq -r '.result.sync_info.latest_block_height'); if [ \"$$bh\" -gt 1 ]; then exit 0; else exit 1; fi"
+      ]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+    volumes:
+      - celestia-app:/home/celestia/.celestia-app
+    command: >
+      start --force-no-bbr
+    depends_on:
+      celestia-init:
+        condition: service_completed_successfully
+    networks:
+      - celestia-zkevm-net
+
+
+volumes:
+  celestia-app:
+
+networks:
+  celestia-zkevm-net:
+    driver: bridge
