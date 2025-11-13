@@ -74,3 +74,44 @@ to
 ```
 
 wherever `.tree_hash_root()` is used and assert that the previous height used in the circuit always matches that from the addtional TrustedState input.
+
+Also change the public outputs from:
+
+```rust
+    let proof_outputs = ProofOutputs {
+        executionStateRoot: *execution.state_root(),
+        newHeader: header,
+        executionBlockNumber: U256::from(*execution.block_number()),
+        nextSyncCommitteeHash: next_sync_committee_hash,
+        newHead: U256::from(head),
+        prevHeader: prev_header,
+        prevHead: U256::from(prev_head),
+        syncCommitteeHash: sync_committee_hash,
+        prevSyncCommitteeHash: prev_sync_committee_hash,
+        storageSlots: storage_slots,
+    };
+
+    // uses Ethereum abi encoding, which is wrong for Celestia
+    sp1_zkvm::io::commit_slice(&proof_outputs.abi_encode());
+```
+
+to
+
+
+```rust
+    let proof_outputs = ProofOutputs {
+        executionStateRoot: *execution.state_root(),
+        newHeader: header,
+        executionBlockNumber: U256::from(*execution.block_number()),
+        nextSyncCommitteeHash: next_sync_committee_hash,
+        newHead: U256::from(head),
+        prevHeader: prev_header,
+        prevHead: U256::from(prev_head),
+        syncCommitteeHash: sync_committee_hash,
+        prevSyncCommitteeHash: prev_sync_committee_hash,
+        storageSlots: storage_slots,
+    };
+
+    // use bincode instead of abi encoding
+    sp1_zkvm::io::commit_slice(&bincode::serialize(proof_outputs).unwrap());
+```
