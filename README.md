@@ -3,7 +3,7 @@ This repo is a prototype / POC of a generic SP1 proof verifier module that exten
 
 ## Motivation and Context
 In order for Celestia to become a hub for connecting all sorts of different chains, we must ensure the availability of trusted state roots.
-Each consensus model may require its own implementation of a consensus client, but it will practically always be a transtion from previous_trusted_state to new_trusted_state.
+Each consensus model may require its own implementation of a consensus client, but it will practically always be a transition from previous_trusted_state to new_trusted_state.
 The `Verifier` module that was added to `celestia-app` for this POC allows anyone to deploy an on-chain verifier for SP1 Groth16 State Transition proofs, enabling Celestia
 to serve trusted roots for all kinds of different chains (Solana, Ethereum, L2s, ...).
 
@@ -15,7 +15,7 @@ The scope of this project is limited to the availability of ZK-verified data roo
 
 ### Groth16
 Currently the verifier only supports SP1 Groth16 proofs that require 2 verifying keys, one that is project specific and a wrapper key specific to SP1.
-Risc0 works similarily but is not supported out of the box because of differences in versioning. It should be possible to extend the verifier to 
+Risc0 works similarly but is not supported out of the box because of differences in versioning. It should be possible to extend the verifier to 
 support Risc0 by ignoring the versioning.
 
 For generic (non-ZKVM) Groth16 proofs, we will have to extend the implementation to handle cases where there is just one verifying key and call the 
