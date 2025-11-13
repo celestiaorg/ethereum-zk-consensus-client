@@ -12,7 +12,7 @@ to serve trusted roots for all kinds of different chains (Solana, Ethereum, L2s,
 
 ### Celestia
 Since Celestia is not a Smart Contract platform, this POC does not include an execution context and only verifies the proofs to update the trusted state.
-The scope of this project is limited to the availability of ZK-verified data roots on Celestia.
+The scope of this project is limited to the availability of ZK-verified state on Celestia.
 
 ### Groth16
 Currently the verifier only supports SP1 Groth16 proofs that require 2 verifying keys, one that is project specific and a wrapper key specific to SP1.
