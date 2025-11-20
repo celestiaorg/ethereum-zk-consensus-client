@@ -1,11 +1,155 @@
+use alloy::sol_types::SolValue;
 use celestia_grpc::{GrpcClient, TxConfig};
-use prost::Name;
-use sp1_sdk::{HashableKey, ProverClient, SP1Stdin, include_elf};
+use sp1_sdk::{ProverClient, SP1Stdin, include_elf};
 use types::TrustedState;
 pub const PROGRAM_ELF: &[u8] = include_elf!("circuit");
 const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
 
+use anyhow::Result;
+use helios_consensus_core::consensus_spec::MainnetConsensusSpec;
+use helios_ethereum::consensus::Inner;
+use helios_ethereum::rpc::ConsensusRpc;
+use helios_ethereum::rpc::http_rpc::HttpRpc;
+use sp1_helios_primitives::types::{ProofInputs, ProofOutputs};
+use sp1_helios_script::{get_client, get_updates};
+use sp1_sdk::{EnvProver, SP1ProofWithPublicValues, SP1ProvingKey};
+use std::sync::Arc;
+use tracing::{error, info};
+
+const TRUSTED_HEAD: u64 = 280984 * 32 - 64;
+const LIGHTCLIENT_ELF: &[u8] = include_bytes!("../../../elfs/helios");
+const CONSENSUS_RPC_URL: &str = "https://ethereum-sepolia-beacon-api.publicnode.com";
+const CHAIN_ID: u64 = 11155111;
+
+pub struct SP1HeliosOperator {
+    client: Arc<EnvProver>,
+    lightclient_pk: Arc<SP1ProvingKey>,
+    source_chain_id: u64,
+    source_consensus_rpc: String,
+}
+
+impl SP1HeliosOperator {
+    /// Fetch values and generate an 'update' proof for the SP1 Helios contract.
+    async fn request_update(
+        &self,
+        client: Inner<MainnetConsensusSpec, HttpRpc>,
+    ) -> Result<Option<SP1ProofWithPublicValues>> {
+        let head: u64 = TRUSTED_HEAD;
+
+        let mut stdin = SP1Stdin::new();
+
+        // Setup client.
+        let updates = get_updates(&client).await;
+        let finality_update = client.rpc.get_finality_update().await.unwrap();
+
+        // Check if contract is up to date
+        let latest_block = finality_update.finalized_header().beacon().slot;
+        if latest_block <= head {
+            info!("Contract is up to date. Nothing to update.");
+            return Ok(None);
+        } else if !latest_block.is_multiple_of(32) {
+            info!("Attempted to commit to a non-checkpoint slot: {latest_block}. Skipping update.");
+            return Ok(None);
+        }
+
+        info!(
+            "Updating to new head block: {:?} from {:?}",
+            latest_block, head
+        );
+
+        // Fetch the contract storage, if any.
+        let contract_storage = Vec::new();
+        // Create program inputs
+        let expected_current_slot = client.expected_current_slot();
+        let inputs = ProofInputs {
+            updates,
+            finality_update,
+            expected_current_slot,
+            store: client.store.clone(),
+            genesis_root: client.config.chain.genesis_root,
+            forks: client.config.forks.clone(),
+            contract_storage,
+        };
+        let encoded_proof_inputs = serde_cbor::to_vec(&inputs)?;
+        stdin.write_slice(&encoded_proof_inputs);
+
+        // Generate proof.
+        let proof = tokio::task::spawn_blocking({
+            let client = self.client.clone();
+            let pk = self.lightclient_pk.clone();
+
+            move || client.prove(&pk, &stdin).plonk().run()
+        })
+        .await??;
+
+        info!("Attempting to update to new head block: {:?}", latest_block);
+        Ok(Some(proof))
+    }
+
+    /// Create a new SP1 Helios operator.
+    pub async fn new(consensus_rpc: String, chain_id: u64) -> Self {
+        let client = ProverClient::from_env();
+
+        tracing::info!("Setting up light client program...");
+        let (lightclient_pk, _) = client.setup(LIGHTCLIENT_ELF);
+
+        let this = Self {
+            client: Arc::new(client),
+            lightclient_pk: Arc::new(lightclient_pk),
+            source_chain_id: chain_id,
+            source_consensus_rpc: consensus_rpc,
+        };
+
+        this
+    }
+
+    /// Run a single iteration of the operator, possibly posting a new update on chain.
+    pub async fn run_once(&self) -> Result<()> {
+        // Get the current slot from the contract
+        let slot = TRUSTED_HEAD;
+
+        // Fetch the checkpoint at that slot
+        let client =
+            get_client(Some(slot), &self.source_consensus_rpc, self.source_chain_id).await?;
+
+        assert_eq!(
+            client.store.finalized_header.beacon().slot,
+            slot,
+            "Bootstrapped client has mismatched finalized slot, this is a bug!"
+        );
+
+        // Request an update
+        match self.request_update(client).await {
+            Ok(Some(proof)) => {
+                info!("Update proof: {:?}", proof);
+            }
+            Ok(None) => {
+                // Contract is up to date. Nothing to update.
+            }
+            Err(e) => {
+                error!("Header range request failed: {}", e);
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[tokio::main]
+async fn main() {
+    let client = get_client(Some(TRUSTED_HEAD), CONSENSUS_RPC_URL, CHAIN_ID)
+        .await
+        .unwrap();
+    let operator = SP1HeliosOperator::new(CONSENSUS_RPC_URL.to_string(), CHAIN_ID).await;
+    let proof = operator.request_update(client).await.unwrap().unwrap();
+    let outputs = ProofOutputs::abi_decode(proof.public_values.as_slice()).unwrap();
+    println!(
+        "New State Root: {:?}, New Height: {:?}",
+        outputs.executionStateRoot, outputs.executionBlockNumber
+    );
+}
+
+/*#[tokio::main]
 async fn main() {
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
@@ -157,3 +301,4 @@ pub struct EventUpdateStateTransitionVerifier {
 // key: 6e30efb1d3ebd30d1ba08c8d5fc9b190e08394009dc1dd787a69e60c33288a8c
 
 //trusted_state: UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
+*/

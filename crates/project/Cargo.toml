@@ -12,6 +12,23 @@ bincode.workspace = true
 hex.workspace = true
 tokio.workspace = true
 rustls = "0.23.31"
+helios-consensus-core.workspace = true
+helios-ethereum.workspace = true
+sp1-helios-primitives.workspace = true
+sp1-helios-script.workspace = true
+serde.workspace = true
+serde_cbor = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-trie = { workspace = true }
+alloy = { workspace = true }
+anyhow = { workspace = true }
+cargo_metadata = { workspace = true }
+reqwest = { workspace = true }
+tree_hash = { workspace = true }
+serde_json = { workspace = true }
+futures = "0.3.31"
+tracing.workspace = true
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [build-dependencies]
-sp1-build = "=5.2.2"
+sp1-build = "=5.2.1"
