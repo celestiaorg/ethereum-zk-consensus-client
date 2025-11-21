@@ -1,8 +1,9 @@
-use alloy::sol_types::SolValue;
+use alloy::{consensus::error, sol_types::SolValue};
 use celestia_grpc::{GrpcClient, TxConfig};
-use sp1_sdk::{ProverClient, SP1Stdin, include_elf};
-use types::TrustedState;
-pub const PROGRAM_ELF: &[u8] = include_elf!("circuit");
+use prost::Name;
+use sp1_sdk::{HashableKey, ProverClient, SP1Proof, SP1Stdin, include_elf};
+use types::{RecursionInput, TrustedState};
+pub const WRAPPER_ELF: &[u8] = include_elf!("circuit");
 const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
 
 use anyhow::Result;
@@ -24,8 +25,8 @@ const CHAIN_ID: u64 = 11155111;
 pub struct SP1HeliosOperator {
     client: Arc<EnvProver>,
     lightclient_pk: Arc<SP1ProvingKey>,
-    source_chain_id: u64,
-    source_consensus_rpc: String,
+    chain_id: u64,
+    consensus_rpc: String,
 }
 
 impl SP1HeliosOperator {
@@ -78,7 +79,7 @@ impl SP1HeliosOperator {
             let client = self.client.clone();
             let pk = self.lightclient_pk.clone();
 
-            move || client.prove(&pk, &stdin).plonk().run()
+            move || client.prove(&pk, &stdin).compressed().run()
         })
         .await??;
 
@@ -96,8 +97,8 @@ impl SP1HeliosOperator {
         let this = Self {
             client: Arc::new(client),
             lightclient_pk: Arc::new(lightclient_pk),
-            source_chain_id: chain_id,
-            source_consensus_rpc: consensus_rpc,
+            chain_id: chain_id,
+            consensus_rpc: consensus_rpc,
         };
 
         this
@@ -109,8 +110,7 @@ impl SP1HeliosOperator {
         let slot = TRUSTED_HEAD;
 
         // Fetch the checkpoint at that slot
-        let client =
-            get_client(Some(slot), &self.source_consensus_rpc, self.source_chain_id).await?;
+        let client = get_client(Some(slot), &self.consensus_rpc, self.chain_id).await?;
 
         assert_eq!(
             client.store.finalized_header.beacon().slot,
@@ -131,6 +131,86 @@ impl SP1HeliosOperator {
             }
         }
 
+        Ok(())
+    }
+
+    pub async fn start_service(&self) -> Result<()> {
+        let mut active_trusted_state: Option<TrustedState> = None;
+        let grpc_client = GrpcClient::builder()
+            .private_key_hex("f7ec3cfaa1ae36c9c907d5ed5397503fc6e9f26cb69bfd83dbe45c5b2a717021")
+            .url("http://localhost:9090")
+            .build()
+            .unwrap();
+        let cfg = TxConfig {
+            gas_limit: Some(1000000),
+            gas_price: Some(1000.0),
+            memo: None,
+            priority: celestia_grpc::grpc::TxPriority::High,
+        };
+        // if no trusted state, generate Helios proof, install Verifier
+        // if trusted state, supply trusted state to wrapper, alongside new Helios proof
+        // submit wrapped proof with outputs to Verifier => update state transition
+        loop {
+            if active_trusted_state.is_none() {
+                let consensus_client =
+                    get_client(Some(TRUSTED_HEAD), &self.consensus_rpc, self.chain_id).await?;
+                assert_eq!(
+                    consensus_client.store.finalized_header.beacon().slot,
+                    TRUSTED_HEAD,
+                    "Bootstrapped client has mismatched finalized slot, this is a bug!"
+                );
+                match self.request_update(consensus_client).await {
+                    Ok(Some(proof)) => {
+                        info!("Installing ISM from Proof outputs");
+                    }
+                    Ok(None) => {
+                        error!("No proof was generated, this is a bug!");
+                    }
+                    Err(e) => {
+                        error!("Header range request failed: {}", e);
+                    }
+                }
+            } else {
+                let trusted_state = active_trusted_state.clone().unwrap();
+                let consensus_client = get_client(
+                    Some(trusted_state.new_head),
+                    &self.consensus_rpc,
+                    self.chain_id,
+                )
+                .await?;
+                assert_eq!(
+                    consensus_client.store.finalized_header.beacon().slot,
+                    trusted_state.new_head,
+                    "Bootstrapped client has mismatched finalized slot, this is a bug!"
+                );
+                match self.request_update(consensus_client).await {
+                    Ok(Some(proof)) => {
+                        info!("Wrapping proof to compute Update");
+                        let (pk, vk) = self.client.setup(WRAPPER_ELF);
+                        let mut stdin = SP1Stdin::new();
+                        // write trusted state
+                        stdin.write(&trusted_state);
+                        let recursion_input = RecursionInput {
+                            vk: vk.vk.hash_u32(),
+                            public_values: proof.public_values.to_vec(),
+                        };
+                        stdin.write(&recursion_input);
+                        let SP1Proof::Compressed(ref proof) = proof.proof else {
+                            panic!()
+                        };
+                        stdin.write_proof(*proof.clone(), vk.vk.clone());
+                        // generate the wrapped proof
+                        let proof = self.client.prove(&pk, &stdin).groth16().run()?;
+                    }
+                    Ok(None) => {
+                        error!("No proof was generated, this is a bug!");
+                    }
+                    Err(e) => {
+                        error!("Header range request failed: {}", e);
+                    }
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -209,7 +289,7 @@ async fn main() {
     let response = client.submit_message(update_message, cfg);
     let out = response.await.unwrap();
     println!("Response: {:?}", out);
-}
+}*/
 
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -301,4 +381,3 @@ pub struct EventUpdateStateTransitionVerifier {
 // key: 6e30efb1d3ebd30d1ba08c8d5fc9b190e08394009dc1dd787a69e60c33288a8c
 
 //trusted_state: UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
-*/
