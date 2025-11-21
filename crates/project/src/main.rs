@@ -1,5 +1,6 @@
 use alloy::sol_types::SolValue;
 use celestia_grpc_client::CelestiaIsmClient;
+use celestia_grpc_client::proto::celestia::zkism::v1::QueryVerifierRequest;
 use celestia_grpc_client::types::ClientConfig;
 use sp1_sdk::{HashableKey, ProverClient, SP1Proof, SP1Stdin, include_elf};
 use types::{MsgCreateStateTransitionVerifier, MsgUpdateStateTransitionVerifier};
@@ -18,7 +19,7 @@ use sp1_sdk::{EnvProver, SP1ProofWithPublicValues, SP1ProvingKey};
 use std::sync::Arc;
 use tracing::{error, info};
 
-const TRUSTED_HEAD: u64 = 280984 * 32 - 64;
+const TRUSTED_HEAD: u64 = 281240 * 32 - 64;
 const LIGHTCLIENT_ELF: &[u8] = include_bytes!("../../../elfs/helios");
 const CONSENSUS_RPC_URL: &str = "https://ethereum-sepolia-beacon-api.publicnode.com";
 const CHAIN_ID: u64 = 11155111;
@@ -241,9 +242,22 @@ impl SP1HeliosOperator {
                         );
                         let response = ism_client.send_tx(update_message).await?;
                         println!("Response: {:?}", response);
+                        let verifier_response = ism_client
+                        .verifier(QueryVerifierRequest {
+                            id: "0x726f757465725f69736d000000000000000000000000002a0000000000000000"
+                                .to_string(),
+                        })
+                        .await
+                        .unwrap();
+
+                        let trusted_state: TrustedState = bincode::deserialize(
+                            &verifier_response.verifier.unwrap().trusted_state,
+                        )
+                        .unwrap();
+                        info!("Verifier Trusted State: {:?}", trusted_state);
                     }
                     Ok(None) => {
-                        error!("No proof was generated, this is a bug!");
+                        info!("Verifier is up to date!");
                     }
                     Err(e) => {
                         error!("Header range request failed: {}", e);
