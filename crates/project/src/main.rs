@@ -1,4 +1,4 @@
-use alloy::{consensus::error, sol_types::SolValue};
+use alloy::sol_types::SolValue;
 use celestia_grpc::{GrpcClient, TxConfig};
 use prost::Name;
 use sp1_sdk::{HashableKey, ProverClient, SP1Proof, SP1Stdin, include_elf};
@@ -136,6 +136,8 @@ impl SP1HeliosOperator {
 
     pub async fn start_service(&self) -> Result<()> {
         let mut active_trusted_state: Option<TrustedState> = None;
+        let (_, helios_vk) = self.client.setup(LIGHTCLIENT_ELF);
+        let (_, wrapper_vk) = self.client.setup(WRAPPER_ELF);
         let grpc_client = GrpcClient::builder()
             .private_key_hex("f7ec3cfaa1ae36c9c907d5ed5397503fc6e9f26cb69bfd83dbe45c5b2a717021")
             .url("http://localhost:9090")
@@ -161,7 +163,38 @@ impl SP1HeliosOperator {
                 );
                 match self.request_update(consensus_client).await {
                     Ok(Some(proof)) => {
+                        let outputs =
+                            ProofOutputs::abi_decode(proof.public_values.as_slice()).unwrap();
                         info!("Installing ISM from Proof outputs");
+                        let initial_trusted_state = TrustedState {
+                            previous_header: outputs.prevHeader.0,
+                            previous_head: outputs.prevHead.try_into().unwrap(),
+                            previous_sync_committee_hash: outputs.prevSyncCommitteeHash.0,
+                            new_head: outputs.newHead.try_into().unwrap(),
+                            new_header: outputs.newHeader.0,
+                            execution_state_root: outputs.executionStateRoot.0,
+                            execution_block_number: outputs
+                                .executionBlockNumber
+                                .try_into()
+                                .unwrap(),
+                            sync_committee_hash: outputs.syncCommitteeHash.0,
+                            next_sync_committee_hash: outputs.nextSyncCommitteeHash.0,
+                            helios_vk: helios_vk.vk.hash_u32(),
+                        };
+                        let initial_trusted_state_bytes =
+                            bincode::serialize(&initial_trusted_state).unwrap();
+                        let create_message = MsgCreateStateTransitionVerifier {
+                            creator: "celestia1d2qfkdk27r2x4y67ua5r2pj7ck5t8n4890x9wy".to_string(),
+                            trusted_state: initial_trusted_state_bytes,
+                            groth16_vkey: GROTH16_VK.to_vec(),
+                            state_transition_vkey: wrapper_vk.vk.bytes32_raw().to_vec(),
+                        };
+                        let response = grpc_client.submit_message(create_message, cfg.clone());
+                        let out = response.await.unwrap();
+                        info!("Transaction submitted: {:?}", out);
+
+                        // udpate trusted state
+                        active_trusted_state = Some(initial_trusted_state);
                     }
                     Ok(None) => {
                         error!("No proof was generated, this is a bug!");
@@ -201,6 +234,23 @@ impl SP1HeliosOperator {
                         stdin.write_proof(*proof.clone(), vk.vk.clone());
                         // generate the wrapped proof
                         let proof = self.client.prove(&pk, &stdin).groth16().run()?;
+                        let update_message = MsgUpdateStateTransitionVerifier {
+                            id:
+                                "0x726f757465725f69736d000000000000000000000000002a0000000000000000"
+                                    .to_string(),
+                            proof: proof.bytes(),
+                            public_values: proof.public_values.to_vec(),
+                            signer: "celestia1d2qfkdk27r2x4y67ua5r2pj7ck5t8n4890x9wy".to_string(),
+                        };
+
+                        println!(
+                            "Public values: {:?}, length: {}",
+                            proof.public_values.to_vec(),
+                            proof.public_values.to_vec().len()
+                        );
+                        let response = grpc_client.submit_message(update_message, cfg.clone());
+                        let out = response.await.unwrap();
+                        println!("Response: {:?}", out);
                     }
                     Ok(None) => {
                         error!("No proof was generated, this is a bug!");
@@ -211,7 +261,6 @@ impl SP1HeliosOperator {
                 }
             }
         }
-        Ok(())
     }
 }
 
