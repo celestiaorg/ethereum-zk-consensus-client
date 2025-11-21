@@ -6,7 +6,8 @@ const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
 #[cfg(test)]
 mod tests {
     use crate::{GROTH16_VK, MOCK_ELF};
-    use celestia_grpc::{GrpcClient, TxConfig};
+    use celestia_grpc_client::CelestiaIsmClient;
+    use celestia_grpc_client::types::ClientConfig;
     use sp1_sdk::{HashableKey, ProverClient, SP1Stdin};
     use types::MockTrustedState;
     use types::{MsgCreateStateTransitionVerifier, MsgUpdateStateTransitionVerifier};
@@ -29,17 +30,10 @@ mod tests {
         let prover_client = ProverClient::from_env();
         let (pk, vk) = prover_client.setup(MOCK_ELF);
 
-        let client = GrpcClient::builder()
-            .private_key_hex("f7ec3cfaa1ae36c9c907d5ed5397503fc6e9f26cb69bfd83dbe45c5b2a717021")
-            .url("http://localhost:9090")
-            .build()
+        let ism_client = CelestiaIsmClient::new(ClientConfig::from_env().unwrap())
+            .await
             .unwrap();
-        let cfg = TxConfig {
-            gas_limit: Some(1000000),
-            gas_price: Some(1000.0),
-            memo: None,
-            priority: celestia_grpc::grpc::TxPriority::High,
-        };
+
         // create verifier module from trusted state
         let create_message = MsgCreateStateTransitionVerifier {
             creator: "celestia1d2qfkdk27r2x4y67ua5r2pj7ck5t8n4890x9wy".to_string(),
@@ -47,9 +41,8 @@ mod tests {
             groth16_vkey: GROTH16_VK.to_vec(),
             state_transition_vkey: vk.bytes32_raw().to_vec(),
         };
-        let response = client.submit_message(create_message, cfg.clone());
-        let out = response.await.unwrap();
-        println!("Response: {:?}", out);
+        let response = ism_client.send_tx(create_message).await.unwrap();
+        println!("Submitted create message: {:?}", response);
         // submit proof to update verifier module
 
         let mut stdin = SP1Stdin::new();
@@ -68,8 +61,7 @@ mod tests {
             proof.public_values.to_vec(),
             proof.public_values.to_vec().len()
         );
-        let response = client.submit_message(update_message, cfg);
-        let out = response.await.unwrap();
-        println!("Response: {:?}", out);
+        let response = ism_client.send_tx(update_message).await.unwrap();
+        println!("Submitted update message: {:?}", response);
     }
 }

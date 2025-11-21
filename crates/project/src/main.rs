@@ -1,5 +1,6 @@
 use alloy::sol_types::SolValue;
-use celestia_grpc::{GrpcClient, TxConfig};
+use celestia_grpc_client::CelestiaIsmClient;
+use celestia_grpc_client::types::ClientConfig;
 use sp1_sdk::{HashableKey, ProverClient, SP1Proof, SP1Stdin, include_elf};
 use types::{MsgCreateStateTransitionVerifier, MsgUpdateStateTransitionVerifier};
 use types::{RecursionInput, TrustedState};
@@ -135,20 +136,11 @@ impl SP1HeliosOperator {
     }
 
     pub async fn start_service(&self) -> Result<()> {
+        dotenvy::dotenv().ok();
         let mut active_trusted_state: Option<TrustedState> = None;
         let (_, helios_vk) = self.client.setup(LIGHTCLIENT_ELF);
         let (_, wrapper_vk) = self.client.setup(WRAPPER_ELF);
-        let grpc_client = GrpcClient::builder()
-            .private_key_hex("f7ec3cfaa1ae36c9c907d5ed5397503fc6e9f26cb69bfd83dbe45c5b2a717021")
-            .url("http://localhost:9090")
-            .build()
-            .unwrap();
-        let cfg = TxConfig {
-            gas_limit: Some(1000000),
-            gas_price: Some(1000.0),
-            memo: None,
-            priority: celestia_grpc::grpc::TxPriority::High,
-        };
+        let ism_client = CelestiaIsmClient::new(ClientConfig::from_env()?).await?;
         // if no trusted state, generate Helios proof, install Verifier
         // if trusted state, supply trusted state to wrapper, alongside new Helios proof
         // submit wrapped proof with outputs to Verifier => update state transition
@@ -189,9 +181,8 @@ impl SP1HeliosOperator {
                             groth16_vkey: GROTH16_VK.to_vec(),
                             state_transition_vkey: wrapper_vk.vk.bytes32_raw().to_vec(),
                         };
-                        let response = grpc_client.submit_message(create_message, cfg.clone());
-                        let out = response.await.unwrap();
-                        info!("Transaction submitted: {:?}", out);
+                        let response = ism_client.send_tx(create_message).await?;
+                        info!("Transaction submitted: {:?}", response);
 
                         // udpate trusted state
                         active_trusted_state = Some(initial_trusted_state);
@@ -248,9 +239,8 @@ impl SP1HeliosOperator {
                             proof.public_values.to_vec(),
                             proof.public_values.to_vec().len()
                         );
-                        let response = grpc_client.submit_message(update_message, cfg.clone());
-                        let out = response.await.unwrap();
-                        println!("Response: {:?}", out);
+                        let response = ism_client.send_tx(update_message).await?;
+                        println!("Response: {:?}", response);
                     }
                     Ok(None) => {
                         error!("No proof was generated, this is a bug!");

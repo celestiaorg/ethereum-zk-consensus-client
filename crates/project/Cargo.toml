@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+celestia-grpc-client.workspace = true
 sp1-sdk.workspace = true
 types.workspace = true
-celestia-grpc.workspace = true
 prost.workspace = true
 bincode.workspace = true
 hex.workspace = true
@@ -29,6 +29,7 @@ serde_json = { workspace = true }
 futures = "0.3.31"
 tracing.workspace = true
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+dotenvy = "0.15.7"
 
 [build-dependencies]
 sp1-build = "=5.2.1"
