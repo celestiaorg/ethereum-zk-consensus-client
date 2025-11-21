@@ -146,8 +146,24 @@ The expected trusted state after running the `project` binary is `AAAAAAAAAAAAAA
 
 Which is correct since in the circuit we set the `new_root` of `trusted_state` to [1;32] and set `new_height` equal to `previous_height` + 1. This is of course a very simple state transition but any state transition that follows the input / output rules will work.
 
+### SP1 Helios Integration
+This repository contains a wrapper circuit and service that can be used to update the `trusted_state` in the Generic Verifier periodically.
+Generating Consensus proofs on CPUs takes a significant amount of time, so network mode is recommended even for testing.
+
+The prover service will initially generate a raw Helios proof and instantiate the Verifier on Celesita from the proof outputs.
+Moving forward it will generate wrapped proofs using the circuit in `crates/circuit` to update the `trusted_state`, following the encoding rules
+of our verifier.
+
+## Encoding Rules
+Proof outputs are structured such that `length_prefix` || `trusted_state` || `new_trusted_state`, where `length_prefix` are little-endian incoded bytes of a u64 and `trusted_state` and `new_trusted_state` are both the raw bytes of the SP1 proof outputs.
+
+## Running the Helios Prover
+```bash
+cargo run -p project --release
+```
+
 ## Path to Mainnet
-If we want to support the integration of new consensus clients on Mainnet, then we might want to extend this POC with Risc0 proof verification, such that we support the most common implementations of ZK Light Clients. We might be able to ditch versioning (which does introduce some risks, so needs discussion), or just add a Ric0 verifier implementation, that also wraps around the underlying Groth16 verifier.
+If we want to support the integration of new consensus clients on Mainnet, then we might want to extend the verifier to also support Risc0 proof verification, such that we support the most common implementations of ZK Light Clients. We might be able to ditch versioning (which does introduce some risks, so needs discussion), or just add a Ric0 verifier implementation, that also wraps around the underlying Groth16 verifier.
 
 Supporting generic Groth16 proofs should be straightforward, but needs discussion if we think it's a necessary addition.
 
