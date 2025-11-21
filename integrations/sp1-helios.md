@@ -1,4 +1,0 @@
-# Integration of SP1's Helios Light Client
-In order to integrate SP1 Helios with the [Generic State Transition Verifier on Celestia](https://github.com/celestiaorg/celestia-app/tree/feat/ethereum-consensus), we wrap the original Helios proof in another circuit, that performs some assertion over the proof inputs against the previous `trusted_state` and then commits the concatenation of (length_prefix || trusted_state || new_trusted_state). The wrapper proof with public outputs is then sent to the Verifier on Celestia, which will apply the state transition and update the trusted state.
-
-The first 32 bytes of both `trusted_state` and `new_trusted_state` are always the `state_root`, which can later be used to verify Hyperlane message proofs against the on-chain incremental tree.

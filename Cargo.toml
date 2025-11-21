@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/circuit", "crates/project", "crates/types"]
+members = ["crates/circuit", "crates/mock", "crates/project", "crates/types"]
 
 [workspace.dependencies]
 sp1-zkvm = "=5.2.1"

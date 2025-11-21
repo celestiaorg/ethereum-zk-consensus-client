@@ -5401,6 +5401,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "serde",
+ "sp1-helios-primitives",
+ "sp1-zkvm",
+ "types",
+]
+
+[[package]]
 name = "moka"
 version = "0.12.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9653,6 +9664,7 @@ checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 name = "types"
 version = "0.1.0"
 dependencies = [
+ "prost",
  "serde",
 ]
 

@@ -73,13 +73,6 @@ of new_trusted_state is arbitrary, but will usually match that of trusted_state.
 
 In the verifier module we store only new_trusted_state after verifying the proof against the current trusted_state (which is initally set when submitting MsgCreateStateTransitionVerifier).
 
-## Integration Guides
-
-See [Sp1 Helios](integrations/sp1-helios.md)
-
-See [Sp1 Tendermint](integrations/sp1-tendermint.md)
-
-
 ## Instructions to run the POC
 
 1. Clone the repo
@@ -115,7 +108,7 @@ The binary will:
 - submit the proof and update the Trusted State Bytes in the Verifier module instance
 
 ```bash
-cargo run -p project --release
+cargo test -p project --release
 ```
 
 4. Query for results
