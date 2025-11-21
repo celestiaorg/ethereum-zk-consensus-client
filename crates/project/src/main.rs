@@ -176,7 +176,7 @@ impl SP1HeliosOperator {
                         let initial_trusted_state_bytes =
                             bincode::serialize(&initial_trusted_state).unwrap();
                         let create_message = MsgCreateStateTransitionVerifier {
-                            creator: "celestia1d2qfkdk27r2x4y67ua5r2pj7ck5t8n4890x9wy".to_string(),
+                            creator: ism_client.signer_address().to_string(),
                             trusted_state: initial_trusted_state_bytes,
                             groth16_vkey: GROTH16_VK.to_vec(),
                             state_transition_vkey: wrapper_vk.vk.bytes32_raw().to_vec(),
@@ -231,7 +231,7 @@ impl SP1HeliosOperator {
                                     .to_string(),
                             proof: proof.bytes(),
                             public_values: proof.public_values.to_vec(),
-                            signer: "celestia1d2qfkdk27r2x4y67ua5r2pj7ck5t8n4890x9wy".to_string(),
+                            signer: ism_client.signer_address().to_string(),
                         };
 
                         println!(
