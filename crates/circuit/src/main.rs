@@ -43,7 +43,7 @@ pub fn main() {
     assert_eq!(new_trusted_state.previous_header, trusted_state.new_header);
     // assert that the new execution block number and header are greater than the previous ones
     assert!(new_trusted_state.execution_block_number > trusted_state.execution_block_number);
-    assert!(new_trusted_state.previous_head > trusted_state.new_head);
+    assert_eq!(new_trusted_state.previous_head, trusted_state.new_head);
     // assert that the verifying key has not changed
     assert_eq!(new_trusted_state.helios_vk, trusted_state.helios_vk);
 

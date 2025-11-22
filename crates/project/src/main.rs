@@ -3,6 +3,7 @@ use celestia_grpc_client::CelestiaIsmClient;
 use celestia_grpc_client::proto::celestia::zkism::v1::QueryVerifierRequest;
 use celestia_grpc_client::types::ClientConfig;
 use sp1_sdk::{HashableKey, ProverClient, SP1Proof, SP1Stdin, include_elf};
+use tracing_subscriber::EnvFilter;
 use types::{MsgCreateStateTransitionVerifier, MsgUpdateStateTransitionVerifier};
 use types::{RecursionInput, TrustedState};
 pub const WRAPPER_ELF: &[u8] = include_elf!("circuit");
@@ -138,6 +139,14 @@ impl SP1HeliosOperator {
 
     pub async fn start_service(&self) -> Result<()> {
         dotenvy::dotenv().ok();
+        let mut filter = EnvFilter::new("sp1_core=warn,sp1_runtime=warn,sp1_sdk=warn,sp1_vm=warn");
+        if let Ok(env_filter) = std::env::var("RUST_LOG")
+            && let Ok(parsed) = env_filter.parse()
+        {
+            filter = filter.add_directive(parsed);
+        }
+        tracing_subscriber::fmt().with_env_filter(filter).init();
+        info!("Starting service...");
         let mut active_trusted_state: Option<TrustedState> = None;
         let (_, helios_vk) = self.client.setup(LIGHTCLIENT_ELF);
         let (_, wrapper_vk) = self.client.setup(WRAPPER_ELF);
@@ -216,7 +225,7 @@ impl SP1HeliosOperator {
                         // write trusted state
                         stdin.write(&trusted_state);
                         let recursion_input = RecursionInput {
-                            vk: vk.vk.hash_u32(),
+                            vk: helios_vk.vk.hash_u32(),
                             public_values: proof.public_values.to_vec(),
                         };
                         stdin.write(&recursion_input);
