@@ -1,0 +1,8 @@
+[2m2025-11-22T10:29:34.821544Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Starting service...
+[2m2025-11-22T10:29:35.865065Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Updating to new head block: 9006080 from 8999616
+[2m2025-11-22T12:47:33.262608Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Attempting to update to new head block: 9006080
+[2m2025-11-22T12:47:33.263648Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Installing ISM from Proof outputs
+[2m2025-11-22T12:47:36.789743Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Transaction submitted: TxResponse { tx_hash: "31112C1D0D68C39E58167FC2E90FA6789A37AA938DD4DC3A81E3E2CF5A0979CF", height: 1972, gas_used: 0, success: true, error_message: None }
+[2m2025-11-22T12:47:37.091744Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Updating to new head block: 9006752 from 8999616
+[2m2025-11-22T14:21:32.244876Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Attempting to update to new head block: 9006752
+[2m2025-11-22T14:21:32.245807Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Wrapping proof to compute Update

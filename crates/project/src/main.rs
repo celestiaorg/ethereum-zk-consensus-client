@@ -232,7 +232,7 @@ impl SP1HeliosOperator {
                         let SP1Proof::Compressed(ref proof) = proof.proof else {
                             panic!()
                         };
-                        stdin.write_proof(*proof.clone(), vk.vk.clone());
+                        stdin.write_proof(*proof.clone(), helios_vk.vk.clone());
                         // generate the wrapped proof
                         let proof = self.client.prove(&pk, &stdin).groth16().run()?;
                         let update_message = MsgUpdateStateTransitionVerifier {
