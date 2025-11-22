@@ -1,8 +1,22 @@
-[2m2025-11-22T10:29:34.821544Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Starting service...
-[2m2025-11-22T10:29:35.865065Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Updating to new head block: 9006080 from 8999616
-[2m2025-11-22T12:47:33.262608Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Attempting to update to new head block: 9006080
-[2m2025-11-22T12:47:33.263648Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Installing ISM from Proof outputs
-[2m2025-11-22T12:47:36.789743Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Transaction submitted: TxResponse { tx_hash: "31112C1D0D68C39E58167FC2E90FA6789A37AA938DD4DC3A81E3E2CF5A0979CF", height: 1972, gas_used: 0, success: true, error_message: None }
-[2m2025-11-22T12:47:37.091744Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Updating to new head block: 9006752 from 8999616
-[2m2025-11-22T14:21:32.244876Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Attempting to update to new head block: 9006752
-[2m2025-11-22T14:21:32.245807Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Wrapping proof to compute Update
+[2m2025-11-22T14:32:34.414367Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Starting service...
+[2m2025-11-22T14:32:35.488062Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Updating to new head block: 9007296 from 8999616
+[2m2025-11-22T16:49:44.994512Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Attempting to update to new head block: 9007296
+[2m2025-11-22T16:49:44.995595Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Installing ISM from Proof outputs
+[2m2025-11-22T16:49:49.010116Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Transaction submitted: TxResponse { tx_hash: "BCD46B3A0336FF9504511700CAD62AD050C40523355A8330200713B98929A303", height: 1960, gas_used: 0, success: true, error_message: None }
+[2m2025-11-22T16:49:49.343454Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Updating to new head block: 9007968 from 8999616
+[2m2025-11-22T18:22:27.296157Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Attempting to update to new head block: 9007968
+[2m2025-11-22T18:22:27.296317Z[0m [32m INFO[0m [2mproject[0m[2m:[0m Wrapping proof to compute Update
+Setting environment variables took 42.125µs
+Reading R1CS took 7.201730334s
+Reading proving key took 579.932083ms
+Reading witness file took 118.167µs
+Deserializing JSON data took 4.22825ms
+Generating witness took 127.98125ms
+[90m19:24:24[0m DBG constraint system solver done [36mnbConstraints=[0m8382715 [36mtook=[0m1199.902959
+[90m19:24:31[0m DBG prover done [36macceleration=[0mnone [36mbackend=[0mgroth16 [36mcurve=[0mbn254 [36mnbConstraints=[0m8382715 [36mtook=[0m6702.76125
+Generating proof took 7.903142792s
+ignoring uninitialized slice: Vars []frontend.Variable
+ignoring uninitialized slice: Vars []frontend.Variable
+ignoring uninitialized slice: Vars []frontend.Variable
+[90m19:24:31[0m DBG verifier done [36mbackend=[0mgroth16 [36mcurve=[0mbn254 [36mtook=[0m0.882708
+Public values: [248, 0, 0, 0, 0, 0, 0, 0, 4, 73, 71, 178, 57, 32, 223, 90, 133, 141, 44, 221, 11, 186, 192, 107, 200, 100, 60, 71, 58, 127, 117, 241, 197, 99, 173, 215, 210, 31, 161, 92, 192, 112, 137, 0, 0, 0, 0, 0, 98, 63, 233, 68, 192, 141, 233, 114, 24, 165, 85, 216, 29, 178, 128, 111, 34, 88, 236, 50, 3, 248, 223, 157, 114, 219, 189, 186, 56, 146, 148, 149, 96, 115, 137, 0, 0, 0, 0, 0, 68, 202, 132, 171, 6, 193, 147, 212, 88, 25, 118, 175, 111, 227, 16, 31, 227, 203, 208, 22, 208, 96, 248, 103, 142, 1, 134, 117, 82, 50, 90, 171, 67, 71, 213, 44, 195, 124, 99, 46, 95, 129, 109, 238, 162, 217, 210, 43, 211, 150, 54, 21, 137, 86, 36, 209, 159, 24, 205, 78, 251, 191, 214, 112, 250, 195, 147, 0, 0, 0, 0, 0, 98, 63, 233, 68, 192, 141, 233, 114, 24, 165, 85, 216, 29, 178, 128, 111, 34, 88, 236, 50, 3, 248, 223, 157, 114, 219, 189, 186, 56, 146, 148, 149, 166, 159, 253, 187, 36, 215, 209, 140, 150, 125, 78, 14, 11, 212, 175, 245, 181, 206, 194, 113, 188, 87, 125, 227, 193, 224, 210, 144, 195, 59, 189, 22, 242, 43, 190, 73, 175, 207, 114, 81, 26, 214, 147, 20, 16, 85, 182, 37, 54, 248, 235, 21, 202, 5, 235, 97, 191, 78, 205, 89, 169, 238, 174, 84, 4, 73, 71, 178, 57, 32, 223, 90, 133, 141, 44, 221, 11, 186, 192, 107, 200, 100, 60, 71, 58, 127, 117, 241, 197, 99, 173, 215, 210, 31, 161, 92, 192, 112, 137, 0, 0, 0, 0, 0, 98, 63, 233, 68, 192, 141, 233, 114, 24, 165, 85, 216, 29, 178, 128, 111, 34, 88, 236, 50, 3, 248, 223, 157, 114, 219, 189, 186, 56, 146, 148, 149, 96, 115, 137, 0, 0, 0, 0, 0, 68, 202, 132, 171, 6, 193, 147, 212, 88, 25, 118, 175, 111, 227, 16, 31, 227, 203, 208, 22, 208, 96, 248, 103, 142, 1, 134, 117, 82, 50, 90, 171, 67, 71, 213, 44, 195, 124, 99, 46, 95, 129, 109, 238, 162, 217, 210, 43, 211, 150, 54, 21, 137, 86, 36, 209, 159, 24, 205, 78, 251, 191, 214, 112, 250, 195, 147, 0, 0, 0, 0, 0, 98, 63, 233, 68, 192, 141, 233, 114, 24, 165, 85, 216, 29, 178, 128, 111, 34, 88, 236, 50, 3, 248, 223, 157, 114, 219, 189, 186, 56, 146, 148, 149, 166, 159, 253, 187, 36, 215, 209, 140, 150, 125, 78, 14, 11, 212, 175, 245, 181, 206, 194, 113, 188, 87, 125, 227, 193, 224, 210, 144, 195, 59, 189, 22, 242, 43, 190, 73, 175, 207, 114, 81, 26, 214, 147, 20, 16, 85, 182, 37, 54, 248, 235, 21, 202, 5, 235, 97, 191, 78, 205, 89, 169, 238, 174, 84], length: 504

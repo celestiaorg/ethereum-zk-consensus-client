@@ -52,7 +52,7 @@ pub fn main() {
     sp1_zkvm::lib::verify::verify_sp1_proof(&recursion_input.vk, &digest.into());
 
     // commit the new outputs
-    let trusted_state_bytes = bincode::serialize(&new_trusted_state).unwrap();
+    let trusted_state_bytes = bincode::serialize(&trusted_state).unwrap();
     let trusted_state_len = trusted_state_bytes.len() as u64;
     let new_trusted_state_bytes = bincode::serialize(&new_trusted_state).unwrap();
     let mut output = Vec::new();
