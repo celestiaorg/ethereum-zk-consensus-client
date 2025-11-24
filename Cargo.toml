@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    "crates/circuit",
+    "crates/sp1-helios",
     "crates/mock",
-    "crates/project",
+    "crates/prover-service",
     "crates/types",
     "crates/celestia-grpc-client",
 ]

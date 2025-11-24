@@ -6,7 +6,7 @@ use sp1_sdk::{HashableKey, ProverClient, SP1Proof, SP1Stdin, include_elf};
 use tracing_subscriber::EnvFilter;
 use types::{MsgCreateStateTransitionVerifier, MsgUpdateStateTransitionVerifier};
 use types::{RecursionInput, TrustedState};
-pub const WRAPPER_ELF: &[u8] = include_elf!("circuit");
+pub const WRAPPER_ELF: &[u8] = include_elf!("sp1-helios");
 const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
 
 use anyhow::Result;
@@ -146,11 +146,24 @@ impl SP1HeliosOperator {
             filter = filter.add_directive(parsed);
         }
         tracing_subscriber::fmt().with_env_filter(filter).init();
-        info!("Starting service...");
-        let mut active_trusted_state: Option<TrustedState> = None;
         let (_, helios_vk) = self.client.setup(LIGHTCLIENT_ELF);
         let (_, wrapper_vk) = self.client.setup(WRAPPER_ELF);
         let ism_client = CelestiaIsmClient::new(ClientConfig::from_env()?).await?;
+
+        info!("Starting service...");
+        let mut active_trusted_state: Option<TrustedState> = None;
+        let verifier_response = ism_client
+            .verifier(QueryVerifierRequest {
+                id: "0x726f757465725f69736d000000000000000000000000002a0000000000000000"
+                    .to_string(),
+            })
+            .await;
+        if verifier_response.is_ok() {
+            active_trusted_state = Some(
+                bincode::deserialize(&verifier_response.unwrap().verifier.unwrap().trusted_state)
+                    .unwrap(),
+            );
+        }
         // if no trusted state, generate Helios proof, install Verifier
         // if trusted state, supply trusted state to wrapper, alongside new Helios proof
         // submit wrapped proof with outputs to Verifier => update state transition
@@ -220,7 +233,7 @@ impl SP1HeliosOperator {
                 match self.request_update(consensus_client).await {
                     Ok(Some(proof)) => {
                         info!("Wrapping proof to compute Update");
-                        let (pk, vk) = self.client.setup(WRAPPER_ELF);
+                        let (pk, _) = self.client.setup(WRAPPER_ELF);
                         let mut stdin = SP1Stdin::new();
                         // write trusted state
                         stdin.write(&trusted_state);
@@ -264,6 +277,7 @@ impl SP1HeliosOperator {
                         )
                         .unwrap();
                         info!("Verifier Trusted State: {:?}", trusted_state);
+                        active_trusted_state = Some(trusted_state);
                     }
                     Ok(None) => {
                         info!("Verifier is up to date!");

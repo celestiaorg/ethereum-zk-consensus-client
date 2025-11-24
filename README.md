@@ -108,7 +108,7 @@ The binary will:
 - submit the proof and update the Trusted State Bytes in the Verifier module instance
 
 ```bash
-cargo test -p project --release
+cargo test -p prover-service --release
 ```
 
 4. Query for results
@@ -121,30 +121,6 @@ celestia-appd q zkism verifiers
 ```
 
 This will list all verifiers (should be one) and also show their trusted state.
-
-Initially we create the Verifier with some `trusted_state`:
-
-```rust
-    let initial_trusted_state = TrustedState {
-        previous_height: 0,
-        previous_root: [0; 32],
-        new_height: 0,
-        new_root: [0; 32],
-    };
-```
-
-The expected trusted state after running the `project` binary is `AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=`, which is equivalent to the serialized `new_trusted_state`:
-
-```rust
-    let initial_trusted_state = TrustedState {
-        previous_height: 0,
-        previous_root: [0; 32],
-        new_height: 1,
-        new_root: [1; 32],
-    };
-```
-
-Which is correct since in the circuit we set the `new_root` of `trusted_state` to [1;32] and set `new_height` equal to `previous_height` + 1. This is of course a very simple state transition but any state transition that follows the input / output rules will work.
 
 ### SP1 Helios Integration
 This repository contains a wrapper circuit and service that can be used to update the `trusted_state` in the Generic Verifier periodically.
@@ -159,7 +135,7 @@ Proof outputs are structured such that `length_prefix` || `trusted_state` || `ne
 
 ## Running the Helios Prover
 ```bash
-cargo run -p project --release
+cargo run -p prover-service --release
 ```
 
 ## Path to Mainnet

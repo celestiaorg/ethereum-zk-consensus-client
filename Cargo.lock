@@ -2505,19 +2505,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "circuit"
-version = "0.1.0"
-dependencies = [
- "alloy-sol-types",
- "bincode",
- "serde",
- "sha2 0.10.9",
- "sp1-helios-primitives",
- "sp1-zkvm",
- "types",
-]
-
-[[package]]
 name = "clang-sys"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6551,39 +6538,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "project"
-version = "0.1.0"
-dependencies = [
- "alloy",
- "alloy-primitives",
- "alloy-trie",
- "anyhow",
- "bincode",
- "cargo_metadata",
- "celestia-grpc-client",
- "dotenvy",
- "futures",
- "helios-consensus-core",
- "helios-ethereum",
- "hex",
- "prost",
- "reqwest",
- "rustls 0.23.35",
- "serde",
- "serde_cbor",
- "serde_json",
- "sp1-build",
- "sp1-helios-primitives",
- "sp1-helios-script",
- "sp1-sdk",
- "tokio",
- "tracing",
- "tracing-subscriber 0.3.20",
- "tree_hash",
- "types",
-]
-
-[[package]]
 name = "proptest"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6691,6 +6645,39 @@ dependencies = [
  "miette",
  "prost-types",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "prover-service"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "alloy-primitives",
+ "alloy-trie",
+ "anyhow",
+ "bincode",
+ "cargo_metadata",
+ "celestia-grpc-client",
+ "dotenvy",
+ "futures",
+ "helios-consensus-core",
+ "helios-ethereum",
+ "hex",
+ "prost",
+ "reqwest",
+ "rustls 0.23.35",
+ "serde",
+ "serde_cbor",
+ "serde_json",
+ "sp1-build",
+ "sp1-helios-primitives",
+ "sp1-helios-script",
+ "sp1-sdk",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.20",
+ "tree_hash",
+ "types",
 ]
 
 [[package]]
@@ -8342,6 +8329,19 @@ checksum = "9e1144840e0b75e988f3b8d24ffd015bc5fd76599f7864bfd994f3eaf2eb261a"
 dependencies = [
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "sp1-helios"
+version = "0.1.0"
+dependencies = [
+ "alloy-sol-types",
+ "bincode",
+ "serde",
+ "sha2 0.10.9",
+ "sp1-helios-primitives",
+ "sp1-zkvm",
+ "types",
 ]
 
 [[package]]
