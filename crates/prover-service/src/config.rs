@@ -29,8 +29,8 @@ impl ProverConfig {
 
         let defaults = ProverConfig::default();
 
-        let consensus_rpc_url = std::env::var("CONSENSUS_RPC_URL")
-            .unwrap_or(defaults.consensus_rpc_url);
+        let consensus_rpc_url =
+            std::env::var("CONSENSUS_RPC_URL").unwrap_or(defaults.consensus_rpc_url);
 
         let chain_id = std::env::var("CHAIN_ID")
             .ok()
@@ -42,11 +42,9 @@ impl ProverConfig {
             .and_then(|s| s.parse().ok())
             .unwrap_or(defaults.trusted_head);
 
-        let verifier_id = std::env::var("VERIFIER_ID")
-            .unwrap_or(defaults.verifier_id);
+        let verifier_id = std::env::var("VERIFIER_ID").unwrap_or(defaults.verifier_id);
 
-        let log_filter = std::env::var("LOG_FILTER")
-            .unwrap_or(defaults.log_filter);
+        let log_filter = std::env::var("LOG_FILTER").unwrap_or(defaults.log_filter);
 
         Ok(Self {
             consensus_rpc_url,

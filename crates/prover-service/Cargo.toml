@@ -32,4 +32,4 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 dotenvy = "0.15.7"
 
 [build-dependencies]
-sp1-build = "=5.2.1"
+sp1-build = "=5.2.2"

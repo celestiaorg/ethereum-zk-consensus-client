@@ -17,6 +17,7 @@ use sp1_helios_primitives::types::{ProofInputs, ProofOutputs};
 use sp1_helios_script::{get_client, get_updates};
 use sp1_sdk::{EnvProver, SP1ProofWithPublicValues, SP1ProvingKey};
 use std::sync::Arc;
+use std::time::Instant;
 use tracing::{error, info};
 pub mod config;
 use config::ProverConfig;
@@ -34,9 +35,8 @@ impl SP1HeliosOperator {
     async fn request_update(
         &self,
         client: Inner<MainnetConsensusSpec, HttpRpc>,
+        head: u64,
     ) -> Result<Option<SP1ProofWithPublicValues>> {
-        let head: u64 = self.config.trusted_head();
-
         let mut stdin = SP1Stdin::new();
 
         // Setup client.
@@ -109,7 +109,12 @@ impl SP1HeliosOperator {
         let slot = self.config.trusted_head();
 
         // Fetch the checkpoint at that slot
-        let client = get_client(Some(slot), self.config.consensus_rpc_url(), self.config.chain_id()).await?;
+        let client = get_client(
+            Some(slot),
+            self.config.consensus_rpc_url(),
+            self.config.chain_id(),
+        )
+        .await?;
 
         assert_eq!(
             client.store.finalized_header.beacon().slot,
@@ -118,7 +123,10 @@ impl SP1HeliosOperator {
         );
 
         // Request an update
-        match self.request_update(client).await {
+        match self
+            .request_update(client, self.config.trusted_head())
+            .await
+        {
             Ok(Some(proof)) => {
                 info!("Update proof: {:?}", proof);
             }
@@ -147,6 +155,7 @@ impl SP1HeliosOperator {
 
         info!("Starting service...");
         let mut active_trusted_state: Option<TrustedState> = None;
+        let mut trusted_head: u64 = self.config.trusted_head();
         let verifier_response = ism_client
             .verifier(QueryVerifierRequest {
                 id: self.config.verifier_id().to_string(),
@@ -163,14 +172,18 @@ impl SP1HeliosOperator {
         // submit wrapped proof with outputs to Verifier => update state transition
         loop {
             if active_trusted_state.is_none() {
-                let consensus_client =
-                    get_client(Some(self.config.trusted_head()), self.config.consensus_rpc_url(), self.config.chain_id()).await?;
+                let consensus_client = get_client(
+                    Some(self.config.trusted_head()),
+                    self.config.consensus_rpc_url(),
+                    self.config.chain_id(),
+                )
+                .await?;
                 assert_eq!(
                     consensus_client.store.finalized_header.beacon().slot,
                     self.config.trusted_head(),
                     "Bootstrapped client has mismatched finalized slot, this is a bug!"
                 );
-                match self.request_update(consensus_client).await {
+                match self.request_update(consensus_client, trusted_head).await {
                     Ok(Some(proof)) => {
                         let outputs =
                             ProofOutputs::abi_decode(proof.public_values.as_slice()).unwrap();
@@ -202,6 +215,7 @@ impl SP1HeliosOperator {
                         info!("Transaction submitted: {:?}", response);
 
                         // udpate trusted state
+                        trusted_head = initial_trusted_state.new_head;
                         active_trusted_state = Some(initial_trusted_state);
                     }
                     Ok(None) => {
@@ -224,7 +238,7 @@ impl SP1HeliosOperator {
                     trusted_state.new_head,
                     "Bootstrapped client has mismatched finalized slot, this is a bug!"
                 );
-                match self.request_update(consensus_client).await {
+                match self.request_update(consensus_client, trusted_head).await {
                     Ok(Some(proof)) => {
                         info!("Wrapping proof to compute Update");
                         let (pk, _) = self.client.setup(WRAPPER_ELF);
@@ -241,7 +255,9 @@ impl SP1HeliosOperator {
                         };
                         stdin.write_proof(*proof.clone(), helios_vk.vk.clone());
                         // generate the wrapped proof
+                        let start_time = Instant::now();
                         let proof = self.client.prove(&pk, &stdin).groth16().run()?;
+                        info!("Elapsed: {:?}", start_time.elapsed().as_millis());
                         let update_message = MsgUpdateStateTransitionVerifier {
                             id: self.config.verifier_id().to_string(),
                             proof: proof.bytes(),
@@ -257,17 +273,18 @@ impl SP1HeliosOperator {
                         let response = ism_client.send_tx(update_message).await?;
                         println!("Response: {:?}", response);
                         let verifier_response = ism_client
-                        .verifier(QueryVerifierRequest {
-                            id: self.config.verifier_id().to_string(),
-                        })
-                        .await
-                        .unwrap();
+                            .verifier(QueryVerifierRequest {
+                                id: self.config.verifier_id().to_string(),
+                            })
+                            .await
+                            .unwrap();
 
                         let trusted_state: TrustedState = bincode::deserialize(
                             &verifier_response.verifier.unwrap().trusted_state,
                         )
                         .unwrap();
                         info!("Verifier Trusted State: {:?}", trusted_state);
+                        trusted_head = trusted_state.new_head;
                         active_trusted_state = Some(trusted_state);
                     }
                     Ok(None) => {
