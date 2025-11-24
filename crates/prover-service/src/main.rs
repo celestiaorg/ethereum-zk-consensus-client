@@ -1,14 +1,16 @@
 use alloy::sol_types::SolValue;
 use celestia_grpc_client::CelestiaIsmClient;
-use celestia_grpc_client::proto::celestia::zkism::v1::QueryVerifierRequest;
+use celestia_grpc_client::proto::celestia::zkism::v1::QueryIsmRequest;
+use celestia_grpc_client::proto::celestia::zkism::v1::query_ism_response::Ism;
 use celestia_grpc_client::types::ClientConfig;
 use sp1_sdk::{HashableKey, ProverClient, SP1Proof, SP1Stdin, include_elf};
 use tracing_subscriber::EnvFilter;
-use types::{MsgCreateStateTransitionVerifier, MsgUpdateStateTransitionVerifier};
+use types::{MsgCreateConsensusISM, MsgUpdateConsensusISM};
 use types::{RecursionInput, TrustedState};
 pub const WRAPPER_ELF: &[u8] = include_elf!("sp1-helios");
 const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
 use anyhow::Result;
+use core::panic;
 use helios_consensus_core::consensus_spec::MainnetConsensusSpec;
 use helios_ethereum::consensus::Inner;
 use helios_ethereum::rpc::ConsensusRpc;
@@ -157,15 +159,17 @@ impl SP1HeliosOperator {
         let mut active_trusted_state: Option<TrustedState> = None;
         let mut trusted_head: u64 = self.config.trusted_head();
         let verifier_response = ism_client
-            .verifier(QueryVerifierRequest {
+            .verifier(QueryIsmRequest {
                 id: self.config.verifier_id().to_string(),
             })
             .await;
         if verifier_response.is_ok() {
-            active_trusted_state = Some(
-                bincode::deserialize(&verifier_response.unwrap().verifier.unwrap().trusted_state)
-                    .unwrap(),
-            );
+            let ism = verifier_response.unwrap().ism.unwrap();
+            let trusted_state = match ism {
+                Ism::EvolveEvmIsm(_) => panic!("EvolveEvmISM is not supported"),
+                Ism::ConsensusIsm(consensus_ism) => consensus_ism.trusted_state,
+            };
+            active_trusted_state = Some(bincode::deserialize(&trusted_state).unwrap());
         }
         // if no trusted state, generate Helios proof, install Verifier
         // if trusted state, supply trusted state to wrapper, alongside new Helios proof
@@ -205,7 +209,7 @@ impl SP1HeliosOperator {
                         };
                         let initial_trusted_state_bytes =
                             bincode::serialize(&initial_trusted_state).unwrap();
-                        let create_message = MsgCreateStateTransitionVerifier {
+                        let create_message = MsgCreateConsensusISM {
                             creator: ism_client.signer_address().to_string(),
                             trusted_state: initial_trusted_state_bytes,
                             groth16_vkey: GROTH16_VK.to_vec(),
@@ -258,7 +262,7 @@ impl SP1HeliosOperator {
                         let start_time = Instant::now();
                         let proof = self.client.prove(&pk, &stdin).groth16().run()?;
                         info!("Elapsed: {:?}", start_time.elapsed().as_millis());
-                        let update_message = MsgUpdateStateTransitionVerifier {
+                        let update_message = MsgUpdateConsensusISM {
                             id: self.config.verifier_id().to_string(),
                             proof: proof.bytes(),
                             public_values: proof.public_values.to_vec(),
@@ -273,15 +277,19 @@ impl SP1HeliosOperator {
                         let response = ism_client.send_tx(update_message).await?;
                         println!("Response: {:?}", response);
                         let verifier_response = ism_client
-                            .verifier(QueryVerifierRequest {
+                            .verifier(QueryIsmRequest {
                                 id: self.config.verifier_id().to_string(),
                             })
                             .await
                             .unwrap();
 
-                        let trusted_state: TrustedState = bincode::deserialize(
-                            &verifier_response.verifier.unwrap().trusted_state,
-                        )
+                        let ism = verifier_response.ism.unwrap();
+                        let trusted_state: TrustedState = bincode::deserialize(&match ism {
+                            Ism::EvolveEvmIsm(_) => {
+                                panic!("EvolveEvmISM is not supported")
+                            }
+                            Ism::ConsensusIsm(consensus_ism) => consensus_ism.trusted_state,
+                        })
                         .unwrap();
                         info!("Verifier Trusted State: {:?}", trusted_state);
                         trusted_head = trusted_state.new_head;

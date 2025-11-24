@@ -3,9 +3,6 @@ use crate::proto::celestia::zkism::v1::{
     query_client::QueryClient, QueryIsmRequest, QueryIsmResponse, QueryIsmsRequest,
     QueryIsmsResponse,
 };
-use crate::proto::celestia::zkism::v1::{
-    QueryVerifierRequest, QueryVerifierResponse, QueryVerifiersRequest, QueryVerifiersResponse,
-};
 use crate::types::{ClientConfig, TxResponse};
 
 use anyhow::Context;
@@ -91,9 +88,9 @@ impl CelestiaIsmClient {
         Ok(resp.into_inner())
     }
 
-    pub async fn verifier(&self, req: QueryVerifierRequest) -> Result<QueryVerifierResponse> {
+    pub async fn verifier(&self, req: QueryIsmRequest) -> Result<QueryIsmResponse> {
         let mut client = QueryClient::new(self.channel.clone());
-        let resp = client.verifier(Request::new(req)).await?;
+        let resp = client.ism(Request::new(req)).await?;
         Ok(resp.into_inner())
     }
 
@@ -103,9 +100,9 @@ impl CelestiaIsmClient {
         Ok(resp.into_inner())
     }
 
-    pub async fn verifiers(&self, req: QueryVerifiersRequest) -> Result<QueryVerifiersResponse> {
+    pub async fn verifiers(&self, req: QueryIsmRequest) -> Result<QueryIsmResponse> {
         let mut client = QueryClient::new(self.channel.clone());
-        let resp = client.verifiers(Request::new(req)).await?;
+        let resp = client.ism(Request::new(req)).await?;
         Ok(resp.into_inner())
     }
 

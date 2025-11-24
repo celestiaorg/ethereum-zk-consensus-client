@@ -1,11 +1,11 @@
 use crate::{
-    proto::{celestia::zkism::v1::MsgCreateZkExecutionIsm, hyperlane::warp::v1::MsgSetToken},
-    MsgProcessMessage, MsgRemoteTransfer, MsgSubmitMessages, MsgUpdateZkExecutionIsm,
+    proto::{celestia::zkism::v1::MsgCreateEvolveEvmIsm, hyperlane::warp::v1::MsgSetToken},
+    MsgProcessMessage, MsgRemoteTransfer, MsgSubmitMessages, MsgUpdateEvolveEvmIsm,
 };
 use prost::Name;
 
 // Legacy aliases for backward compatibility
-pub type StateTransitionProofMsg = MsgUpdateZkExecutionIsm;
+pub type StateTransitionProofMsg = MsgUpdateEvolveEvmIsm;
 pub type StateInclusionProofMsg = MsgSubmitMessages;
 pub type HyperlaneMessage = MsgProcessMessage;
 
@@ -14,12 +14,12 @@ impl Name for MsgSetToken {
     const PACKAGE: &'static str = "hyperlane.warp.v1";
 }
 
-impl Name for MsgCreateZkExecutionIsm {
-    const NAME: &'static str = "MsgCreateZKExecutionISM";
+impl Name for MsgCreateEvolveEvmIsm {
+    const NAME: &'static str = "MsgCreateEvolveEvmISM ";
     const PACKAGE: &'static str = "celestia.zkism.v1";
 }
 
-impl MsgUpdateZkExecutionIsm {
+impl MsgUpdateEvolveEvmIsm {
     /// Create a new ZK execution ISM update message
     pub fn new(id: String, proof: Vec<u8>, public_values: Vec<u8>, signer: String) -> Self {
         Self {
@@ -31,8 +31,8 @@ impl MsgUpdateZkExecutionIsm {
     }
 }
 
-impl Name for MsgUpdateZkExecutionIsm {
-    const NAME: &'static str = "MsgUpdateZKExecutionISM";
+impl Name for MsgUpdateEvolveEvmIsm {
+    const NAME: &'static str = "MsgUpdateEvolveEvmISM ";
     const PACKAGE: &'static str = "celestia.zkism.v1";
 }
 

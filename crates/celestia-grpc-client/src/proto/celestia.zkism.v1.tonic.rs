@@ -134,56 +134,6 @@ pub mod query_client {
                 .insert(GrpcMethod::new("celestia.zkism.v1.Query", "Isms"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn verifier(
-            &mut self,
-            request: impl tonic::IntoRequest<super::QueryVerifierRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::QueryVerifierResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/celestia.zkism.v1.Query/Verifier",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("celestia.zkism.v1.Query", "Verifier"));
-            self.inner.unary(req, path, codec).await
-        }
-        pub async fn verifiers(
-            &mut self,
-            request: impl tonic::IntoRequest<super::QueryVerifiersRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::QueryVerifiersResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/celestia.zkism.v1.Query/Verifiers",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("celestia.zkism.v1.Query", "Verifiers"));
-            self.inner.unary(req, path, codec).await
-        }
         pub async fn params(
             &mut self,
             request: impl tonic::IntoRequest<super::QueryParamsRequest>,
@@ -230,20 +180,6 @@ pub mod query_server {
             request: tonic::Request<super::QueryIsmsRequest>,
         ) -> std::result::Result<
             tonic::Response<super::QueryIsmsResponse>,
-            tonic::Status,
-        >;
-        async fn verifier(
-            &self,
-            request: tonic::Request<super::QueryVerifierRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::QueryVerifierResponse>,
-            tonic::Status,
-        >;
-        async fn verifiers(
-            &self,
-            request: tonic::Request<super::QueryVerifiersRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::QueryVerifiersResponse>,
             tonic::Status,
         >;
         async fn params(
@@ -401,96 +337,6 @@ pub mod query_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = IsmsSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/celestia.zkism.v1.Query/Verifier" => {
-                    #[allow(non_camel_case_types)]
-                    struct VerifierSvc<T: Query>(pub Arc<T>);
-                    impl<
-                        T: Query,
-                    > tonic::server::UnaryService<super::QueryVerifierRequest>
-                    for VerifierSvc<T> {
-                        type Response = super::QueryVerifierResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::QueryVerifierRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Query>::verifier(&inner, request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = VerifierSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/celestia.zkism.v1.Query/Verifiers" => {
-                    #[allow(non_camel_case_types)]
-                    struct VerifiersSvc<T: Query>(pub Arc<T>);
-                    impl<
-                        T: Query,
-                    > tonic::server::UnaryService<super::QueryVerifiersRequest>
-                    for VerifiersSvc<T> {
-                        type Response = super::QueryVerifiersResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::QueryVerifiersRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Query>::verifiers(&inner, request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = VerifiersSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -668,11 +514,11 @@ pub mod msg_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
-        pub async fn create_state_transition_verifier(
+        pub async fn create_consensus_ism(
             &mut self,
-            request: impl tonic::IntoRequest<super::MsgCreateStateTransitionVerifier>,
+            request: impl tonic::IntoRequest<super::MsgCreateConsensusIsm>,
         ) -> std::result::Result<
-            tonic::Response<super::MsgCreateStateTransitionVerifierResponse>,
+            tonic::Response<super::MsgCreateConsensusIsmResponse>,
             tonic::Status,
         > {
             self.inner
@@ -686,23 +532,18 @@ pub mod msg_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/celestia.zkism.v1.Msg/CreateStateTransitionVerifier",
+                "/celestia.zkism.v1.Msg/CreateConsensusISM",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "celestia.zkism.v1.Msg",
-                        "CreateStateTransitionVerifier",
-                    ),
-                );
+                .insert(GrpcMethod::new("celestia.zkism.v1.Msg", "CreateConsensusISM"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn update_state_transition_verifier(
+        pub async fn update_consensus_ism(
             &mut self,
-            request: impl tonic::IntoRequest<super::MsgUpdateStateTransitionVerifier>,
+            request: impl tonic::IntoRequest<super::MsgUpdateConsensusIsm>,
         ) -> std::result::Result<
-            tonic::Response<super::MsgUpdateStateTransitionVerifierResponse>,
+            tonic::Response<super::MsgUpdateConsensusIsmResponse>,
             tonic::Status,
         > {
             self.inner
@@ -716,23 +557,18 @@ pub mod msg_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/celestia.zkism.v1.Msg/UpdateStateTransitionVerifier",
+                "/celestia.zkism.v1.Msg/UpdateConsensusISM",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "celestia.zkism.v1.Msg",
-                        "UpdateStateTransitionVerifier",
-                    ),
-                );
+                .insert(GrpcMethod::new("celestia.zkism.v1.Msg", "UpdateConsensusISM"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn create_zk_execution_ism(
+        pub async fn create_evolve_evm_ism(
             &mut self,
-            request: impl tonic::IntoRequest<super::MsgCreateZkExecutionIsm>,
+            request: impl tonic::IntoRequest<super::MsgCreateEvolveEvmIsm>,
         ) -> std::result::Result<
-            tonic::Response<super::MsgCreateZkExecutionIsmResponse>,
+            tonic::Response<super::MsgCreateEvolveEvmIsmResponse>,
             tonic::Status,
         > {
             self.inner
@@ -746,20 +582,18 @@ pub mod msg_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/celestia.zkism.v1.Msg/CreateZKExecutionISM",
+                "/celestia.zkism.v1.Msg/CreateEvolveEvmISM",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("celestia.zkism.v1.Msg", "CreateZKExecutionISM"),
-                );
+                .insert(GrpcMethod::new("celestia.zkism.v1.Msg", "CreateEvolveEvmISM"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn update_zk_execution_ism(
+        pub async fn update_evolve_evm_ism(
             &mut self,
-            request: impl tonic::IntoRequest<super::MsgUpdateZkExecutionIsm>,
+            request: impl tonic::IntoRequest<super::MsgUpdateEvolveEvmIsm>,
         ) -> std::result::Result<
-            tonic::Response<super::MsgUpdateZkExecutionIsmResponse>,
+            tonic::Response<super::MsgUpdateEvolveEvmIsmResponse>,
             tonic::Status,
         > {
             self.inner
@@ -773,13 +607,11 @@ pub mod msg_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/celestia.zkism.v1.Msg/UpdateZKExecutionISM",
+                "/celestia.zkism.v1.Msg/UpdateEvolveEvmISM",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("celestia.zkism.v1.Msg", "UpdateZKExecutionISM"),
-                );
+                .insert(GrpcMethod::new("celestia.zkism.v1.Msg", "UpdateEvolveEvmISM"));
             self.inner.unary(req, path, codec).await
         }
         pub async fn submit_messages(
@@ -841,32 +673,32 @@ pub mod msg_server {
     /// Generated trait containing gRPC methods that should be implemented for use with MsgServer.
     #[async_trait]
     pub trait Msg: Send + Sync + 'static {
-        async fn create_state_transition_verifier(
+        async fn create_consensus_ism(
             &self,
-            request: tonic::Request<super::MsgCreateStateTransitionVerifier>,
+            request: tonic::Request<super::MsgCreateConsensusIsm>,
         ) -> std::result::Result<
-            tonic::Response<super::MsgCreateStateTransitionVerifierResponse>,
+            tonic::Response<super::MsgCreateConsensusIsmResponse>,
             tonic::Status,
         >;
-        async fn update_state_transition_verifier(
+        async fn update_consensus_ism(
             &self,
-            request: tonic::Request<super::MsgUpdateStateTransitionVerifier>,
+            request: tonic::Request<super::MsgUpdateConsensusIsm>,
         ) -> std::result::Result<
-            tonic::Response<super::MsgUpdateStateTransitionVerifierResponse>,
+            tonic::Response<super::MsgUpdateConsensusIsmResponse>,
             tonic::Status,
         >;
-        async fn create_zk_execution_ism(
+        async fn create_evolve_evm_ism(
             &self,
-            request: tonic::Request<super::MsgCreateZkExecutionIsm>,
+            request: tonic::Request<super::MsgCreateEvolveEvmIsm>,
         ) -> std::result::Result<
-            tonic::Response<super::MsgCreateZkExecutionIsmResponse>,
+            tonic::Response<super::MsgCreateEvolveEvmIsmResponse>,
             tonic::Status,
         >;
-        async fn update_zk_execution_ism(
+        async fn update_evolve_evm_ism(
             &self,
-            request: tonic::Request<super::MsgUpdateZkExecutionIsm>,
+            request: tonic::Request<super::MsgUpdateEvolveEvmIsm>,
         ) -> std::result::Result<
-            tonic::Response<super::MsgUpdateZkExecutionIsmResponse>,
+            tonic::Response<super::MsgUpdateEvolveEvmIsmResponse>,
             tonic::Status,
         >;
         async fn submit_messages(
@@ -960,32 +792,25 @@ pub mod msg_server {
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             match req.uri().path() {
-                "/celestia.zkism.v1.Msg/CreateStateTransitionVerifier" => {
+                "/celestia.zkism.v1.Msg/CreateConsensusISM" => {
                     #[allow(non_camel_case_types)]
-                    struct CreateStateTransitionVerifierSvc<T: Msg>(pub Arc<T>);
+                    struct CreateConsensusISMSvc<T: Msg>(pub Arc<T>);
                     impl<
                         T: Msg,
-                    > tonic::server::UnaryService<
-                        super::MsgCreateStateTransitionVerifier,
-                    > for CreateStateTransitionVerifierSvc<T> {
-                        type Response = super::MsgCreateStateTransitionVerifierResponse;
+                    > tonic::server::UnaryService<super::MsgCreateConsensusIsm>
+                    for CreateConsensusISMSvc<T> {
+                        type Response = super::MsgCreateConsensusIsmResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<
-                                super::MsgCreateStateTransitionVerifier,
-                            >,
+                            request: tonic::Request<super::MsgCreateConsensusIsm>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as Msg>::create_state_transition_verifier(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
+                                <T as Msg>::create_consensus_ism(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -996,7 +821,7 @@ pub mod msg_server {
                     let max_encoding_message_size = self.max_encoding_message_size;
                     let inner = self.inner.clone();
                     let fut = async move {
-                        let method = CreateStateTransitionVerifierSvc(inner);
+                        let method = CreateConsensusISMSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -1012,32 +837,25 @@ pub mod msg_server {
                     };
                     Box::pin(fut)
                 }
-                "/celestia.zkism.v1.Msg/UpdateStateTransitionVerifier" => {
+                "/celestia.zkism.v1.Msg/UpdateConsensusISM" => {
                     #[allow(non_camel_case_types)]
-                    struct UpdateStateTransitionVerifierSvc<T: Msg>(pub Arc<T>);
+                    struct UpdateConsensusISMSvc<T: Msg>(pub Arc<T>);
                     impl<
                         T: Msg,
-                    > tonic::server::UnaryService<
-                        super::MsgUpdateStateTransitionVerifier,
-                    > for UpdateStateTransitionVerifierSvc<T> {
-                        type Response = super::MsgUpdateStateTransitionVerifierResponse;
+                    > tonic::server::UnaryService<super::MsgUpdateConsensusIsm>
+                    for UpdateConsensusISMSvc<T> {
+                        type Response = super::MsgUpdateConsensusIsmResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<
-                                super::MsgUpdateStateTransitionVerifier,
-                            >,
+                            request: tonic::Request<super::MsgUpdateConsensusIsm>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as Msg>::update_state_transition_verifier(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
+                                <T as Msg>::update_consensus_ism(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -1048,7 +866,7 @@ pub mod msg_server {
                     let max_encoding_message_size = self.max_encoding_message_size;
                     let inner = self.inner.clone();
                     let fut = async move {
-                        let method = UpdateStateTransitionVerifierSvc(inner);
+                        let method = UpdateConsensusISMSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -1064,25 +882,25 @@ pub mod msg_server {
                     };
                     Box::pin(fut)
                 }
-                "/celestia.zkism.v1.Msg/CreateZKExecutionISM" => {
+                "/celestia.zkism.v1.Msg/CreateEvolveEvmISM" => {
                     #[allow(non_camel_case_types)]
-                    struct CreateZKExecutionISMSvc<T: Msg>(pub Arc<T>);
+                    struct CreateEvolveEvmISMSvc<T: Msg>(pub Arc<T>);
                     impl<
                         T: Msg,
-                    > tonic::server::UnaryService<super::MsgCreateZkExecutionIsm>
-                    for CreateZKExecutionISMSvc<T> {
-                        type Response = super::MsgCreateZkExecutionIsmResponse;
+                    > tonic::server::UnaryService<super::MsgCreateEvolveEvmIsm>
+                    for CreateEvolveEvmISMSvc<T> {
+                        type Response = super::MsgCreateEvolveEvmIsmResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::MsgCreateZkExecutionIsm>,
+                            request: tonic::Request<super::MsgCreateEvolveEvmIsm>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as Msg>::create_zk_execution_ism(&inner, request).await
+                                <T as Msg>::create_evolve_evm_ism(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -1093,7 +911,7 @@ pub mod msg_server {
                     let max_encoding_message_size = self.max_encoding_message_size;
                     let inner = self.inner.clone();
                     let fut = async move {
-                        let method = CreateZKExecutionISMSvc(inner);
+                        let method = CreateEvolveEvmISMSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -1109,25 +927,25 @@ pub mod msg_server {
                     };
                     Box::pin(fut)
                 }
-                "/celestia.zkism.v1.Msg/UpdateZKExecutionISM" => {
+                "/celestia.zkism.v1.Msg/UpdateEvolveEvmISM" => {
                     #[allow(non_camel_case_types)]
-                    struct UpdateZKExecutionISMSvc<T: Msg>(pub Arc<T>);
+                    struct UpdateEvolveEvmISMSvc<T: Msg>(pub Arc<T>);
                     impl<
                         T: Msg,
-                    > tonic::server::UnaryService<super::MsgUpdateZkExecutionIsm>
-                    for UpdateZKExecutionISMSvc<T> {
-                        type Response = super::MsgUpdateZkExecutionIsmResponse;
+                    > tonic::server::UnaryService<super::MsgUpdateEvolveEvmIsm>
+                    for UpdateEvolveEvmISMSvc<T> {
+                        type Response = super::MsgUpdateEvolveEvmIsmResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::MsgUpdateZkExecutionIsm>,
+                            request: tonic::Request<super::MsgUpdateEvolveEvmIsm>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as Msg>::update_zk_execution_ism(&inner, request).await
+                                <T as Msg>::update_evolve_evm_ism(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -1138,7 +956,7 @@ pub mod msg_server {
                     let max_encoding_message_size = self.max_encoding_message_size;
                     let inner = self.inner.clone();
                     let fut = async move {
-                        let method = UpdateZKExecutionISMSvc(inner);
+                        let method = UpdateEvolveEvmISMSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

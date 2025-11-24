@@ -31,7 +31,7 @@ pub struct RecursionInput {
 
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MsgCreateStateTransitionVerifier {
+pub struct MsgCreateConsensusISM {
     /// creator is the message sender.
     #[prost(string, tag = "1")]
     pub creator: ::prost::alloc::string::String,
@@ -45,22 +45,22 @@ pub struct MsgCreateStateTransitionVerifier {
     pub state_transition_vkey: ::prost::alloc::vec::Vec<u8>,
 }
 
-impl Name for MsgCreateStateTransitionVerifier {
-    const NAME: &'static str = "MsgCreateStateTransitionVerifier";
+impl Name for MsgCreateConsensusISM {
+    const NAME: &'static str = "MsgCreateConsensusISM";
     const PACKAGE: &'static str = "celestia.zkism.v1";
 }
 
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MsgCreateStateTransitionVerifierResponse {
+pub struct MsgCreateConsensusISMResponse {
     #[prost(bytes = "vec", tag = "1")]
     pub trusted_state: ::prost::alloc::vec::Vec<u8>,
 }
 
-/// MsgUpdateZKExecutionISM is the request type for UpdateZKExecutionISM.
+/// MsgUpdateEvolveEvmISM  is the request type for UpdateEvolveEvmISM .
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MsgUpdateStateTransitionVerifier {
+pub struct MsgUpdateConsensusISM {
     /// ism identifier
     #[prost(string, tag = "1")]
     pub id: ::prost::alloc::string::String,
@@ -75,14 +75,14 @@ pub struct MsgUpdateStateTransitionVerifier {
     pub signer: ::prost::alloc::string::String,
 }
 
-impl Name for MsgUpdateStateTransitionVerifier {
-    const NAME: &'static str = "MsgUpdateStateTransitionVerifier";
+impl Name for MsgUpdateConsensusISM {
+    const NAME: &'static str = "MsgUpdateConsensusISM";
     const PACKAGE: &'static str = "celestia.zkism.v1";
 }
 
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MsgUpdateStateTransitionVerifierResponse {
+pub struct MsgUpdateConsensusISMResponse {
     #[prost(bytes = "vec", tag = "1")]
     pub trusted_state: ::prost::alloc::vec::Vec<u8>,
 }

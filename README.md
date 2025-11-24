@@ -54,9 +54,9 @@ pub fn main() {
 
 ```mermaid
     sequenceDiagram;
-        Client->>Module: submit MsgCreateStateTransitionVerifier with initial trusted state bytes;
+        Client->>Module: submit MsgCreateConsensusISM with initial trusted state bytes;
         Circuit->>Client: generate a state transition proof from trusted state to new trusted state;
-        Client->>Module: submit MsgUpdateStateTransitionVerifier with new trusted state;
+        Client->>Module: submit MsgUpdateConsensusISM with new trusted state;
         Module->>SP1 Verifier: Verify proof and update trusted state;
 ```
 
@@ -64,14 +64,14 @@ pub fn main() {
 ### Types
 
 ```
-MsgUpdateStateTransitionVerifier:
+MsgUpdateConsensusISM:
     public_outputs = length_prefix || trusted_state || new_trusted_state
 ```
 
 The length_prefix is the little-endian encoded u64 length of trusted_state. The length
 of new_trusted_state is arbitrary, but will usually match that of trusted_state.
 
-In the verifier module we store only new_trusted_state after verifying the proof against the current trusted_state (which is initally set when submitting MsgCreateStateTransitionVerifier).
+In the verifier module we store only new_trusted_state after verifying the proof against the current trusted_state (which is initally set when submitting MsgCreateConsensusISM).
 
 ## Instructions to run the POC
 

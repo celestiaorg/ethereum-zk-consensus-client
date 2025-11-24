@@ -7,11 +7,12 @@ const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
 mod tests {
     use crate::{GROTH16_VK, MOCK_ELF};
     use celestia_grpc_client::CelestiaIsmClient;
-    use celestia_grpc_client::proto::celestia::zkism::v1::QueryVerifierRequest;
+    use celestia_grpc_client::proto::celestia::zkism::v1::QueryIsmRequest;
+    use celestia_grpc_client::proto::celestia::zkism::v1::query_ism_response::Ism;
     use celestia_grpc_client::types::ClientConfig;
     use sp1_sdk::{HashableKey, ProverClient, SP1Stdin};
     use types::MockTrustedState;
-    use types::{MsgCreateStateTransitionVerifier, MsgUpdateStateTransitionVerifier};
+    use types::{MsgCreateConsensusISM, MsgUpdateConsensusISM};
 
     #[tokio::test]
     async fn test_mock_circuit() {
@@ -41,7 +42,7 @@ mod tests {
             .unwrap();
 
         // create verifier module from trusted state
-        let create_message = MsgCreateStateTransitionVerifier {
+        let create_message = MsgCreateConsensusISM {
             creator: ism_client.signer_address().to_string(),
             trusted_state: initial_trusted_state_bytes,
             groth16_vkey: GROTH16_VK.to_vec(),
@@ -55,7 +56,7 @@ mod tests {
         stdin.write(&initial_trusted_state);
         let proof = prover_client.prove(&pk, &stdin).groth16().run().unwrap();
 
-        let update_message = MsgUpdateStateTransitionVerifier {
+        let update_message = MsgUpdateConsensusISM {
             id: "0x726f757465725f69736d000000000000000000000000002a0000000000000000".to_string(),
             proof: proof.bytes(),
             public_values: proof.public_values.to_vec(),
@@ -71,15 +72,20 @@ mod tests {
         println!("Submitted update message: {:?}", response);
 
         let verifier_response = ism_client
-            .verifier(QueryVerifierRequest {
+            .verifier(QueryIsmRequest {
                 id: "0x726f757465725f69736d000000000000000000000000002a0000000000000000"
                     .to_string(),
             })
             .await
             .unwrap();
+        let ism = verifier_response.ism.unwrap();
+        let trusted_state: MockTrustedState = match ism {
+            Ism::EvolveEvmIsm(_) => panic!("EvolveEvmISM is not supported"),
+            Ism::ConsensusIsm(consensus_ism) => {
+                bincode::deserialize(&consensus_ism.trusted_state).unwrap()
+            }
+        };
 
-        let trusted_state: MockTrustedState =
-            bincode::deserialize(&verifier_response.verifier.unwrap().trusted_state).unwrap();
         println!("Verifier Trusted State: {:?}", trusted_state);
     }
 }

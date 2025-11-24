@@ -3,7 +3,9 @@
 use anyhow::Result;
 use celestia_grpc_client::proto::celestia::zkism::v1::{QueryIsmRequest, QueryIsmsRequest};
 use celestia_grpc_client::types::ClientConfig;
-use celestia_grpc_client::{CelestiaIsmClient, MsgRemoteTransfer, StateInclusionProofMsg, StateTransitionProofMsg};
+use celestia_grpc_client::{
+    CelestiaIsmClient, MsgRemoteTransfer, StateInclusionProofMsg, StateTransitionProofMsg,
+};
 use clap::{Parser, Subcommand};
 use tracing::{info, Level};
 
@@ -16,7 +18,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Submit a state transition proof (MsgUpdateZKExecutionISM)
+    /// Submit a state transition proof (MsgUpdateEvolveEvmISM )
     StateTransition {
         /// ISM identifier
         #[arg(long)]
@@ -83,7 +85,10 @@ async fn main() -> Result<()> {
     let config = ClientConfig::from_env()?;
     let client = CelestiaIsmClient::new(config).await?;
 
-    info!("CelestiaISMClient using signer address: {}", client.signer_address());
+    info!(
+        "CelestiaISMClient using signer address: {}",
+        client.signer_address()
+    );
 
     match &cli.command {
         Commands::StateTransition {
@@ -91,13 +96,14 @@ async fn main() -> Result<()> {
             proof_file,
             public_values_file,
         } => {
-            info!("Submitting state transition proof (MsgUpdateZKExecutionISM)...");
+            info!("Submitting state transition proof (MsgUpdateEvolveEvmISM )...");
 
             let proof = read_hex_file(proof_file)?;
             let public_values = read_hex_file(public_values_file)?;
             let signer_address = client.signer_address().to_string();
 
-            let proof_msg = StateTransitionProofMsg::new(id.clone(), proof, public_values, signer_address);
+            let proof_msg =
+                StateTransitionProofMsg::new(id.clone(), proof, public_values, signer_address);
 
             let response = client.send_tx(proof_msg).await?;
             println!("State transition proof submitted successfully!");
@@ -117,7 +123,13 @@ async fn main() -> Result<()> {
             let public_values = read_hex_file(public_values_file)?;
             let signer_address = client.signer_address().to_string();
 
-            let proof_msg = StateInclusionProofMsg::new(id.clone(), *height, proof, public_values, signer_address);
+            let proof_msg = StateInclusionProofMsg::new(
+                id.clone(),
+                *height,
+                proof,
+                public_values,
+                signer_address,
+            );
 
             let response = client.send_tx(proof_msg).await?;
             println!("State inclusion proof submitted successfully!");
