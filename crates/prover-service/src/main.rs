@@ -8,7 +8,6 @@ use types::{MsgCreateStateTransitionVerifier, MsgUpdateStateTransitionVerifier};
 use types::{RecursionInput, TrustedState};
 pub const WRAPPER_ELF: &[u8] = include_elf!("sp1-helios");
 const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
-
 use anyhow::Result;
 use helios_consensus_core::consensus_spec::MainnetConsensusSpec;
 use helios_ethereum::consensus::Inner;
@@ -19,17 +18,15 @@ use sp1_helios_script::{get_client, get_updates};
 use sp1_sdk::{EnvProver, SP1ProofWithPublicValues, SP1ProvingKey};
 use std::sync::Arc;
 use tracing::{error, info};
+pub mod config;
+use config::ProverConfig;
 
-const TRUSTED_HEAD: u64 = 281240 * 32 - 64;
 const LIGHTCLIENT_ELF: &[u8] = include_bytes!("../../../elfs/helios");
-const CONSENSUS_RPC_URL: &str = "https://ethereum-sepolia-beacon-api.publicnode.com";
-const CHAIN_ID: u64 = 11155111;
 
 pub struct SP1HeliosOperator {
     client: Arc<EnvProver>,
     lightclient_pk: Arc<SP1ProvingKey>,
-    chain_id: u64,
-    consensus_rpc: String,
+    config: ProverConfig,
 }
 
 impl SP1HeliosOperator {
@@ -38,7 +35,7 @@ impl SP1HeliosOperator {
         &self,
         client: Inner<MainnetConsensusSpec, HttpRpc>,
     ) -> Result<Option<SP1ProofWithPublicValues>> {
-        let head: u64 = TRUSTED_HEAD;
+        let head: u64 = self.config.trusted_head();
 
         let mut stdin = SP1Stdin::new();
 
@@ -91,7 +88,7 @@ impl SP1HeliosOperator {
     }
 
     /// Create a new SP1 Helios operator.
-    pub async fn new(consensus_rpc: String, chain_id: u64) -> Self {
+    pub async fn new(config: ProverConfig) -> Self {
         let client = ProverClient::from_env();
 
         tracing::info!("Setting up light client program...");
@@ -100,8 +97,7 @@ impl SP1HeliosOperator {
         let this = Self {
             client: Arc::new(client),
             lightclient_pk: Arc::new(lightclient_pk),
-            chain_id: chain_id,
-            consensus_rpc: consensus_rpc,
+            config,
         };
 
         this
@@ -110,10 +106,10 @@ impl SP1HeliosOperator {
     /// Run a single iteration of the operator, possibly posting a new update on chain.
     pub async fn run_once(&self) -> Result<()> {
         // Get the current slot from the contract
-        let slot = TRUSTED_HEAD;
+        let slot = self.config.trusted_head();
 
         // Fetch the checkpoint at that slot
-        let client = get_client(Some(slot), &self.consensus_rpc, self.chain_id).await?;
+        let client = get_client(Some(slot), self.config.consensus_rpc_url(), self.config.chain_id()).await?;
 
         assert_eq!(
             client.store.finalized_header.beacon().slot,
@@ -138,8 +134,7 @@ impl SP1HeliosOperator {
     }
 
     pub async fn start_service(&self) -> Result<()> {
-        dotenvy::dotenv().ok();
-        let mut filter = EnvFilter::new("sp1_core=warn,sp1_runtime=warn,sp1_sdk=warn,sp1_vm=warn");
+        let mut filter = EnvFilter::new(self.config.log_filter());
         if let Ok(env_filter) = std::env::var("RUST_LOG")
             && let Ok(parsed) = env_filter.parse()
         {
@@ -154,8 +149,7 @@ impl SP1HeliosOperator {
         let mut active_trusted_state: Option<TrustedState> = None;
         let verifier_response = ism_client
             .verifier(QueryVerifierRequest {
-                id: "0x726f757465725f69736d000000000000000000000000002a0000000000000000"
-                    .to_string(),
+                id: self.config.verifier_id().to_string(),
             })
             .await;
         if verifier_response.is_ok() {
@@ -170,10 +164,10 @@ impl SP1HeliosOperator {
         loop {
             if active_trusted_state.is_none() {
                 let consensus_client =
-                    get_client(Some(TRUSTED_HEAD), &self.consensus_rpc, self.chain_id).await?;
+                    get_client(Some(self.config.trusted_head()), self.config.consensus_rpc_url(), self.config.chain_id()).await?;
                 assert_eq!(
                     consensus_client.store.finalized_header.beacon().slot,
-                    TRUSTED_HEAD,
+                    self.config.trusted_head(),
                     "Bootstrapped client has mismatched finalized slot, this is a bug!"
                 );
                 match self.request_update(consensus_client).await {
@@ -221,8 +215,8 @@ impl SP1HeliosOperator {
                 let trusted_state = active_trusted_state.clone().unwrap();
                 let consensus_client = get_client(
                     Some(trusted_state.new_head),
-                    &self.consensus_rpc,
-                    self.chain_id,
+                    self.config.consensus_rpc_url(),
+                    self.config.chain_id(),
                 )
                 .await?;
                 assert_eq!(
@@ -249,9 +243,7 @@ impl SP1HeliosOperator {
                         // generate the wrapped proof
                         let proof = self.client.prove(&pk, &stdin).groth16().run()?;
                         let update_message = MsgUpdateStateTransitionVerifier {
-                            id:
-                                "0x726f757465725f69736d000000000000000000000000002a0000000000000000"
-                                    .to_string(),
+                            id: self.config.verifier_id().to_string(),
                             proof: proof.bytes(),
                             public_values: proof.public_values.to_vec(),
                             signer: ism_client.signer_address().to_string(),
@@ -266,8 +258,7 @@ impl SP1HeliosOperator {
                         println!("Response: {:?}", response);
                         let verifier_response = ism_client
                         .verifier(QueryVerifierRequest {
-                            id: "0x726f757465725f69736d000000000000000000000000002a0000000000000000"
-                                .to_string(),
+                            id: self.config.verifier_id().to_string(),
                         })
                         .await
                         .unwrap();
@@ -296,7 +287,9 @@ async fn main() {
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .expect("Failed to set default crypto provider");
-    let operator = SP1HeliosOperator::new(CONSENSUS_RPC_URL.to_string(), CHAIN_ID).await;
+
+    let config = ProverConfig::from_env().expect("Failed to load configuration");
+    let operator = SP1HeliosOperator::new(config).await;
     info!("Starting service...");
     operator.start_service().await.unwrap();
 }
