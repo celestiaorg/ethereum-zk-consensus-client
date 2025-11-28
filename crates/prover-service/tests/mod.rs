@@ -8,7 +8,6 @@ mod tests {
     use crate::{GROTH16_VK, MOCK_ELF};
     use celestia_grpc_client::CelestiaIsmClient;
     use celestia_grpc_client::proto::celestia::zkism::v1::QueryIsmRequest;
-    use celestia_grpc_client::proto::celestia::zkism::v1::query_ism_response::Ism;
     use celestia_grpc_client::types::ClientConfig;
     use sp1_sdk::{HashableKey, ProverClient, SP1Stdin};
     use types::MockTrustedState;
@@ -79,12 +78,7 @@ mod tests {
             .await
             .unwrap();
         let ism = verifier_response.ism.unwrap();
-        let trusted_state: MockTrustedState = match ism {
-            Ism::EvolveEvmIsm(_) => panic!("EvolveEvmISM is not supported"),
-            Ism::ConsensusIsm(consensus_ism) => {
-                bincode::deserialize(&consensus_ism.trusted_state).unwrap()
-            }
-        };
+        let trusted_state: MockTrustedState = bincode::deserialize(&ism.state).unwrap();
 
         println!("Verifier Trusted State: {:?}", trusted_state);
     }

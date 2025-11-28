@@ -1,7 +1,6 @@
 use alloy::sol_types::SolValue;
 use celestia_grpc_client::CelestiaIsmClient;
 use celestia_grpc_client::proto::celestia::zkism::v1::QueryIsmRequest;
-use celestia_grpc_client::proto::celestia::zkism::v1::query_ism_response::Ism;
 use celestia_grpc_client::types::ClientConfig;
 use sp1_sdk::{HashableKey, ProverClient, SP1Proof, SP1Stdin, include_elf};
 use tracing_subscriber::EnvFilter;
@@ -165,11 +164,7 @@ impl SP1HeliosOperator {
             .await;
         if verifier_response.is_ok() {
             let ism = verifier_response.unwrap().ism.unwrap();
-            let trusted_state = match ism {
-                Ism::EvolveEvmIsm(_) => panic!("EvolveEvmISM is not supported"),
-                Ism::ConsensusIsm(consensus_ism) => consensus_ism.trusted_state,
-            };
-            active_trusted_state = Some(bincode::deserialize(&trusted_state).unwrap());
+            active_trusted_state = Some(bincode::deserialize(&ism.state).unwrap());
         }
         // if no trusted state, generate Helios proof, install Verifier
         // if trusted state, supply trusted state to wrapper, alongside new Helios proof
@@ -284,13 +279,7 @@ impl SP1HeliosOperator {
                             .unwrap();
 
                         let ism = verifier_response.ism.unwrap();
-                        let trusted_state: TrustedState = bincode::deserialize(&match ism {
-                            Ism::EvolveEvmIsm(_) => {
-                                panic!("EvolveEvmISM is not supported")
-                            }
-                            Ism::ConsensusIsm(consensus_ism) => consensus_ism.trusted_state,
-                        })
-                        .unwrap();
+                        let trusted_state: TrustedState = bincode::deserialize(&ism.state).unwrap();
                         info!("Verifier Trusted State: {:?}", trusted_state);
                         trusted_head = trusted_state.new_head;
                         active_trusted_state = Some(trusted_state);

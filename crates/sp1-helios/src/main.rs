@@ -55,9 +55,11 @@ pub fn main() {
     let trusted_state_bytes = bincode::serialize(&trusted_state).unwrap();
     let trusted_state_len = trusted_state_bytes.len() as u64;
     let new_trusted_state_bytes = bincode::serialize(&new_trusted_state).unwrap();
+    let new_trusted_state_len = new_trusted_state_bytes.len() as u64;
     let mut output = Vec::new();
     output.extend_from_slice(&trusted_state_len.to_le_bytes());
     output.extend_from_slice(&trusted_state_bytes);
+    output.extend_from_slice(&new_trusted_state_len.to_le_bytes());
     output.extend_from_slice(&new_trusted_state_bytes);
     sp1_zkvm::io::commit_slice(&output);
 }
