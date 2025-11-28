@@ -20,7 +20,7 @@ impl Name for MsgSetToken {
 }
 
 impl Name for MsgCreateInterchainSecurityModule {
-    const NAME: &'static str = "MsgCreateInterchainSecurityModule ";
+    const NAME: &'static str = "MsgCreateInterchainSecurityModule";
     const PACKAGE: &'static str = "celestia.zkism.v1";
 }
 
@@ -37,7 +37,7 @@ impl MsgUpdateInterchainSecurityModule {
 }
 
 impl Name for MsgUpdateInterchainSecurityModule {
-    const NAME: &'static str = "MsgUpdateInterchainSecurityModule ";
+    const NAME: &'static str = "MsgUpdateInterchainSecurityModule";
     const PACKAGE: &'static str = "celestia.zkism.v1";
 }
 

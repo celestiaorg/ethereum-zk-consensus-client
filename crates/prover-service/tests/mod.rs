@@ -24,10 +24,10 @@ mod tests {
             .unwrap();
 
         let initial_trusted_state = MockTrustedState {
-            previous_height: 0,
             previous_root: [0; 32],
-            new_height: 0,
+            previous_height: 0,
             new_root: [0; 32],
+            new_height: 0,
         };
 
         let initial_trusted_state_bytes = bincode::serialize(&initial_trusted_state).unwrap();
