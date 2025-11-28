@@ -20,14 +20,14 @@ pub fn main() {
     let helios_outputs = ProofOutputs::abi_decode(&recursion_input.public_values).unwrap();
 
     let new_trusted_state = TrustedState {
+        execution_state_root: helios_outputs.executionStateRoot.0,
+        execution_block_number: helios_outputs.executionBlockNumber.try_into().unwrap(),
+        new_header: helios_outputs.newHeader.0,
+        new_head: helios_outputs.newHead.try_into().unwrap(),
+        sync_committee_hash: helios_outputs.syncCommitteeHash.0,
         previous_header: helios_outputs.prevHeader.0,
         previous_head: helios_outputs.prevHead.try_into().unwrap(),
         previous_sync_committee_hash: helios_outputs.prevSyncCommitteeHash.0,
-        new_head: helios_outputs.newHead.try_into().unwrap(),
-        new_header: helios_outputs.newHeader.0,
-        execution_state_root: helios_outputs.executionStateRoot.0,
-        execution_block_number: helios_outputs.executionBlockNumber.try_into().unwrap(),
-        sync_committee_hash: helios_outputs.syncCommitteeHash.0,
         next_sync_committee_hash: helios_outputs.nextSyncCommitteeHash.0,
         helios_vk: recursion_input.vk,
     };
