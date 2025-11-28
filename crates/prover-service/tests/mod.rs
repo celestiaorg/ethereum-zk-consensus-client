@@ -6,12 +6,15 @@ const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
 #[cfg(test)]
 mod tests {
     use crate::{GROTH16_VK, MOCK_ELF};
-    use celestia_grpc_client::CelestiaIsmClient;
-    use celestia_grpc_client::proto::celestia::zkism::v1::QueryIsmRequest;
+    use celestia_grpc_client::proto::celestia::zkism::v1::{
+        MsgUpdateInterchainSecurityModule, QueryIsmRequest,
+    };
     use celestia_grpc_client::types::ClientConfig;
+    use celestia_grpc_client::{
+        CelestiaIsmClient, proto::celestia::zkism::v1::MsgCreateInterchainSecurityModule,
+    };
     use sp1_sdk::{HashableKey, ProverClient, SP1Stdin};
     use types::MockTrustedState;
-    use types::{MsgCreateConsensusISM, MsgUpdateConsensusISM};
 
     #[tokio::test]
     async fn test_mock_circuit() {
@@ -41,11 +44,13 @@ mod tests {
             .unwrap();
 
         // create verifier module from trusted state
-        let create_message = MsgCreateConsensusISM {
+        let create_message = MsgCreateInterchainSecurityModule {
             creator: ism_client.signer_address().to_string(),
-            trusted_state: initial_trusted_state_bytes,
+            state: initial_trusted_state_bytes,
             groth16_vkey: GROTH16_VK.to_vec(),
             state_transition_vkey: vk.bytes32_raw().to_vec(),
+            // todo: replace with actual state membership vkey
+            state_membership_vkey: vk.bytes32_raw().to_vec(),
         };
         let response = ism_client.send_tx(create_message).await.unwrap();
         println!("Submitted create message: {:?}", response);
@@ -55,7 +60,7 @@ mod tests {
         stdin.write(&initial_trusted_state);
         let proof = prover_client.prove(&pk, &stdin).groth16().run().unwrap();
 
-        let update_message = MsgUpdateConsensusISM {
+        let update_message = MsgUpdateInterchainSecurityModule {
             id: "0x726f757465725f69736d000000000000000000000000002a0000000000000000".to_string(),
             proof: proof.bytes(),
             public_values: proof.public_values.to_vec(),

@@ -1,10 +1,13 @@
 use alloy::sol_types::SolValue;
-use celestia_grpc_client::CelestiaIsmClient;
-use celestia_grpc_client::proto::celestia::zkism::v1::QueryIsmRequest;
+use celestia_grpc_client::proto::celestia::zkism::v1::{
+    MsgUpdateInterchainSecurityModule, QueryIsmRequest,
+};
 use celestia_grpc_client::types::ClientConfig;
+use celestia_grpc_client::{
+    CelestiaIsmClient, proto::celestia::zkism::v1::MsgCreateInterchainSecurityModule,
+};
 use sp1_sdk::{HashableKey, ProverClient, SP1Proof, SP1Stdin, include_elf};
 use tracing_subscriber::EnvFilter;
-use types::{MsgCreateConsensusISM, MsgUpdateConsensusISM};
 use types::{RecursionInput, TrustedState};
 pub const WRAPPER_ELF: &[u8] = include_elf!("sp1-helios");
 const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
@@ -204,11 +207,13 @@ impl SP1HeliosOperator {
                         };
                         let initial_trusted_state_bytes =
                             bincode::serialize(&initial_trusted_state).unwrap();
-                        let create_message = MsgCreateConsensusISM {
+                        let create_message = MsgCreateInterchainSecurityModule {
                             creator: ism_client.signer_address().to_string(),
-                            trusted_state: initial_trusted_state_bytes,
+                            state: initial_trusted_state_bytes,
                             groth16_vkey: GROTH16_VK.to_vec(),
                             state_transition_vkey: wrapper_vk.vk.bytes32_raw().to_vec(),
+                            // todo: replace with actual state membership vkey
+                            state_membership_vkey: wrapper_vk.vk.bytes32_raw().to_vec(),
                         };
                         let response = ism_client.send_tx(create_message).await?;
                         info!("Transaction submitted: {:?}", response);
@@ -257,7 +262,7 @@ impl SP1HeliosOperator {
                         let start_time = Instant::now();
                         let proof = self.client.prove(&pk, &stdin).groth16().run()?;
                         info!("Elapsed: {:?}", start_time.elapsed().as_millis());
-                        let update_message = MsgUpdateConsensusISM {
+                        let update_message = MsgUpdateInterchainSecurityModule {
                             id: self.config.verifier_id().to_string(),
                             proof: proof.bytes(),
                             public_values: proof.public_values.to_vec(),
