@@ -4,46 +4,47 @@ use alloy::{
     sol_types::SolValue,
 };
 use alloy_primitives::{Address, FixedBytes};
+use anyhow::Result;
 use celestia_grpc_client::{
-    CelestiaIsmClient, proto::celestia::zkism::v1::MsgCreateInterchainSecurityModule,
+    CelestiaIsmClient, MsgSubmitMessages,
+    proto::celestia::zkism::v1::{
+        MsgCreateInterchainSecurityModule, MsgUpdateInterchainSecurityModule, QueryIsmRequest,
+    },
     types::ClientConfig,
 };
-use celestia_grpc_client::{
-    MsgSubmitMessages,
-    proto::celestia::zkism::v1::{MsgUpdateInterchainSecurityModule, QueryIsmRequest},
-};
+use core::panic;
 use ev_zkevm_types::programs::hyperlane::types::{
     HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs,
     HyperlaneMessageInputs,
 };
-use sp1_sdk::{
-    HashableKey, Prover, ProverClient, SP1Proof, SP1Stdin, include_elf, network::NetworkMode,
-};
-use tracing_subscriber::EnvFilter;
-use types::{RecursionInput, TrustedState};
-pub const WRAPPER_ELF: &[u8] = include_elf!("sp1-helios");
-const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
-use anyhow::Result;
-use core::panic;
 use helios_consensus_core::consensus_spec::MainnetConsensusSpec;
 use helios_ethereum::{consensus::Inner, rpc::ConsensusRpc, rpc::http_rpc::HttpRpc};
 use sp1_helios_primitives::types::{ProofInputs, ProofOutputs};
 use sp1_helios_script::{get_client, get_updates};
 use sp1_prover::components::CpuProverComponents;
-use sp1_sdk::{SP1ProofWithPublicValues, SP1ProvingKey};
+use sp1_sdk::{
+    HashableKey, Prover, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1ProvingKey, SP1Stdin,
+    include_elf, network::NetworkMode,
+};
 use std::{str::FromStr, sync::Arc, time::Instant};
 use tracing::{debug, error, info};
+use tracing_subscriber::EnvFilter;
+use types::{RecursionInput, TrustedState};
 use zkevm_storage::hyperlane::{
     StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore,
 };
+
 pub mod config;
 mod hyperlane;
+
 use config::ProverConfig;
 
-pub type SP1Prover = dyn Prover<CpuProverComponents>;
-
+pub const WRAPPER_ELF: &[u8] = include_elf!("sp1-helios");
+const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
 const LIGHTCLIENT_ELF: &[u8] = include_bytes!("../../../elfs/helios");
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
+
+pub type SP1Prover = dyn Prover<CpuProverComponents>;
 
 pub struct SP1HeliosOperator {
     prover_client: Arc<SP1Prover>,
@@ -81,6 +82,7 @@ impl SP1HeliosOperator {
 
         // Fetch the contract storage, if any.
         let contract_storage = Vec::new();
+
         // Create program inputs
         let expected_current_slot = client.expected_current_slot();
         let inputs = ProofInputs {
@@ -129,13 +131,11 @@ impl SP1HeliosOperator {
         tracing::info!("Setting up light client program...");
         let (lightclient_pk, _) = prover_client.setup(LIGHTCLIENT_ELF);
 
-        let this = Self {
+        Self {
             prover_client,
             lightclient_pk: Arc::new(lightclient_pk),
             config,
-        };
-
-        this
+        }
     }
 
     /// Run a single iteration of the operator, possibly posting a new update on chain.
@@ -184,13 +184,10 @@ impl SP1HeliosOperator {
             filter = filter.add_directive(parsed);
         }
         tracing_subscriber::fmt().with_env_filter(filter).init();
+
         let (_, helios_vk) = self.prover_client.setup(LIGHTCLIENT_ELF);
         let (_, wrapper_vk) = self.prover_client.setup(WRAPPER_ELF);
-        let prover_client = ProverClient::builder()
-            .network_for(NetworkMode::Mainnet)
-            .rpc_url("https://rpc.mainnet.succinct.xyz")
-            .build();
-        let (hyperlane_pk, hyperlane_vk) = prover_client.setup(EV_HYPERLANE_ELF);
+        let (hyperlane_pk, hyperlane_vk) = self.prover_client.setup(EV_HYPERLANE_ELF);
         let ism_client = CelestiaIsmClient::new(ClientConfig::from_env()?).await?;
 
         info!("Starting service...");
@@ -372,6 +369,7 @@ impl SP1HeliosOperator {
             hyperlane::index_sepolia(
                 indexer_height,
                 trusted_execution_block_number,
+                Address::from_str(&self.config.mailbox_address)?,
                 hyperlane_message_store.clone(),
                 evm_provider.clone().into(),
             )
@@ -397,10 +395,7 @@ impl SP1HeliosOperator {
                 .collect::<Result<Vec<_>>>()?;
 
             let merkle_proof = evm_provider
-                .get_proof(
-                    Address::from_str("0xA82571C75164B76721C4047182b73014072E3D9B")?,
-                    keys,
-                )
+                .get_proof(Address::from_str(&self.config.merkle_tree_address)?, keys)
                 .block_id(trusted_execution_block_number.into())
                 .await?;
 
@@ -413,7 +408,7 @@ impl SP1HeliosOperator {
             // Construct program inputs from values
             let input = HyperlaneMessageInputs::new(
                 hex::encode(active_trusted_state.clone().unwrap().execution_state_root),
-                Address::from_str("0xA82571C75164B76721C4047182b73014072E3D9B")
+                Address::from_str(&self.config.merkle_tree_address)
                     .unwrap()
                     .to_string(),
                 messages.clone().into_iter().map(|m| m.message).collect(),
@@ -423,12 +418,14 @@ impl SP1HeliosOperator {
 
             let mut stdin = SP1Stdin::new();
             stdin.write(&input);
-            let proof = prover_client.prove(&hyperlane_pk, &stdin).groth16().run()?;
+            let proof =
+                self.prover_client
+                    .prove(&hyperlane_pk, &stdin, sp1_sdk::SP1ProofMode::Groth16)?;
 
             // submit proof to ZKISM verifier
             // Prepare the proof submission message
             let message_proof_msg = MsgSubmitMessages::new(
-                "0x726f757465725f69736d000000000000000000000000002a0000000000000000".to_string(),
+                self.config.verifier_id().to_string(),
                 trusted_head,
                 proof.bytes(),
                 proof.public_values.to_vec(),
@@ -471,11 +468,3 @@ async fn main() {
     info!("Starting service...");
     operator.start_service().await.unwrap();
 }
-
-// address: celestia1d2qfkdk27r2x4y67ua5r2pj7ck5t8n4890x9wy
-// address: celestia1y3kf30y9zprqzr2g2gjjkw3wls0a35pfs3a58q
-
-// key: f7ec3cfaa1ae36c9c907d5ed5397503fc6e9f26cb69bfd83dbe45c5b2a717021
-// key: 6e30efb1d3ebd30d1ba08c8d5fc9b190e08394009dc1dd787a69e60c33288a8c
-
-//trusted_state: UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==

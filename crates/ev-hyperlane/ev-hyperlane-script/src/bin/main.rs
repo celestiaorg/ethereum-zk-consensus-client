@@ -84,6 +84,7 @@ async fn main() {
         // Setup the program for proving.
         let (pk, vk) = client.setup(EV_HYPERLANE_ELF);
         let start_time = Instant::now();
+
         // Generate the proof
         let proof = client
             .prove(&pk, &stdin)
@@ -110,6 +111,7 @@ async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
         .join("data");
     let message_db =
         HyperlaneMessageStore::new(storage_path).expect("Failed to create message database");
+
     let mut messages = Vec::new();
     // insert messages into local database
     for height in args.start_height..=args.target_height {
@@ -120,9 +122,11 @@ async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
             messages.push(block_message);
         }
     }
+
     // get the merkle proofs from the EVM execution client
     let provider = ProviderBuilder::new()
         .connect_http(Url::from_str(&args.rpc_url).expect("Failed to create provider"));
+
     let proof = provider
         .get_proof(
             Address::from_str(&args.contract).expect("Failed to create contract address"),
@@ -156,5 +160,6 @@ async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
         MerkleTree::default(),
     );
     stdin.write(&inputs);
+
     Ok(())
 }

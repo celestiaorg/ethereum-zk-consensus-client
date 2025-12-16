@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use alloy::rpc::types::Filter;
 use alloy_primitives::Address;
@@ -10,6 +10,7 @@ use zkevm_storage::hyperlane::message::HyperlaneMessageStore;
 pub async fn index_sepolia(
     start_height: u64,
     end_height: u64,
+    mailbox_address: Address,
     storage: Arc<HyperlaneMessageStore>,
     provider: DefaultProvider,
 ) -> Result<(), anyhow::Error> {
@@ -21,9 +22,7 @@ pub async fn index_sepolia(
             current_height, to_block
         );
         let filter = Filter::new()
-            .address(Address::from_str(
-                "0xC591542b7C43f1E79Df47526F7459Ed609Aff2a3",
-            )?)
+            .address(mailbox_address)
             .event(&Dispatch::id())
             .from_block(current_height)
             .to_block(to_block);
@@ -40,6 +39,7 @@ pub async fn index_sepolia(
 async fn test_index_sepolia() {
     use alloy::providers::ProviderBuilder;
     use reqwest::Url;
+    use std::str::FromStr;
     use zkevm_storage::hyperlane::StoredHyperlaneMessage;
 
     let evm_provider = ProviderBuilder::new()
@@ -56,6 +56,7 @@ async fn test_index_sepolia() {
     crate::hyperlane::index_sepolia(
         0,
         9853049,
+        Address::from_str("0xC591542b7C43f1E79Df47526F7459Ed609Aff2a3").unwrap(),
         hyperlane_message_store.clone(),
         evm_provider.clone().into(),
     )
