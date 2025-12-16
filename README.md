@@ -11,8 +11,8 @@ to serve trusted roots for all kinds of different chains (Solana, Ethereum, L2s,
 ## Limitations
 
 ### Celestia
-Since Celestia is not a Smart Contract platform, this POC does not include an execution context and only verifies the proofs to update the trusted state.
-The scope of this project is limited to the availability of ZK-verified state on Celestia.
+This project leverages the generic state transition verifier and hyperlane message proofs against the incremental tree, to relay messages from
+Ethereum to Celestia. Similar to other ZK Light Clients, the trust assumption lies in the circuit implementation and trusted state + sync committee. 
 
 ### Groth16
 Currently the verifier only supports SP1 Groth16 proofs that require 2 verifying keys, one that is project specific and a wrapper key specific to SP1.
