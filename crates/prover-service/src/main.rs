@@ -208,8 +208,8 @@ impl SP1HeliosOperator {
             })
             .await;
 
-        if verifier_response.is_ok() {
-            let ism = verifier_response.unwrap().ism.unwrap();
+        if let Ok(verifier_response) = verifier_response {
+            let ism = verifier_response.ism.unwrap();
             active_trusted_state = Some(bincode::deserialize(&ism.state).unwrap());
         }
 
@@ -379,7 +379,7 @@ impl SP1HeliosOperator {
                 trusted_execution_block_number,
                 Address::from_str(&self.config.mailbox_address)?,
                 hyperlane_message_store.clone(),
-                evm_provider.clone().into(),
+                evm_provider.clone(),
             )
             .await?;
 
