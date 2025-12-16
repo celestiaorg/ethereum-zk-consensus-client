@@ -26,7 +26,11 @@ use sp1_sdk::{
     HashableKey, Prover, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1ProvingKey, SP1Stdin,
     include_elf, network::NetworkMode,
 };
-use std::{str::FromStr, sync::Arc, time::Instant};
+use std::{
+    str::FromStr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tracing::{debug, error, info};
 use tracing_subscriber::EnvFilter;
 use types::{RecursionInput, TrustedState};
@@ -69,9 +73,13 @@ impl SP1HeliosOperator {
         let latest_block = finality_update.finalized_header().beacon().slot;
         if latest_block <= head {
             info!("Contract is up to date. Nothing to update.");
+            tokio::time::sleep(Duration::from_secs(10)).await;
             return Ok(None);
         } else if !latest_block.is_multiple_of(32) {
-            info!("Attempted to commit to a non-checkpoint slot: {latest_block}. Skipping update.");
+            error!(
+                "Attempted to commit to a non-checkpoint slot: {latest_block}. Skipping update."
+            );
+            tokio::time::sleep(Duration::from_secs(10)).await;
             return Ok(None);
         }
 
@@ -363,7 +371,7 @@ impl SP1HeliosOperator {
             // and submit it to the ISM
             info!(
                 "Indexing messages from height {} to {}",
-                indexer_height, trusted_head
+                indexer_height, trusted_execution_block_number
             );
 
             hyperlane::index_sepolia(
