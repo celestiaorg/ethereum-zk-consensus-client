@@ -30,6 +30,11 @@ futures = "0.3.31"
 tracing.workspace = true
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 dotenvy = "0.15.7"
+dirs.workspace = true
+zkevm-storage.workspace = true
+ev-state-queries.workspace = true
+ev-zkevm-types.workspace = true
+
 
 [build-dependencies]
 sp1-build = "=5.2.2"

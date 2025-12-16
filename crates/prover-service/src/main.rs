@@ -1,12 +1,26 @@
-use alloy::sol_types::SolValue;
-use celestia_grpc_client::proto::celestia::zkism::v1::{
-    MsgUpdateInterchainSecurityModule, QueryIsmRequest,
+use alloy::{
+    hex::FromHex,
+    providers::{Provider, ProviderBuilder},
+    sol_types::SolValue,
 };
-use celestia_grpc_client::types::ClientConfig;
+use alloy_primitives::{Address, FixedBytes};
 use celestia_grpc_client::{
     CelestiaIsmClient, proto::celestia::zkism::v1::MsgCreateInterchainSecurityModule,
+    types::ClientConfig,
 };
-use sp1_sdk::{HashableKey, ProverClient, SP1Proof, SP1Stdin, include_elf};
+use celestia_grpc_client::{
+    MsgSubmitMessages,
+    proto::celestia::zkism::v1::{MsgUpdateInterchainSecurityModule, QueryIsmRequest},
+};
+use ev_zkevm_types::programs::hyperlane::types::{
+    HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs,
+    HyperlaneMessageInputs,
+};
+use reqwest::Url;
+use sp1_sdk::{
+    HashableKey, NetworkProver, Prover, ProverClient, SP1Proof, SP1Stdin, include_elf,
+    network::NetworkMode,
+};
 use tracing_subscriber::EnvFilter;
 use types::{RecursionInput, TrustedState};
 pub const WRAPPER_ELF: &[u8] = include_elf!("sp1-helios");
@@ -14,22 +28,24 @@ const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
 use anyhow::Result;
 use core::panic;
 use helios_consensus_core::consensus_spec::MainnetConsensusSpec;
-use helios_ethereum::consensus::Inner;
-use helios_ethereum::rpc::ConsensusRpc;
-use helios_ethereum::rpc::http_rpc::HttpRpc;
+use helios_ethereum::{consensus::Inner, rpc::ConsensusRpc, rpc::http_rpc::HttpRpc};
 use sp1_helios_primitives::types::{ProofInputs, ProofOutputs};
 use sp1_helios_script::{get_client, get_updates};
 use sp1_sdk::{EnvProver, SP1ProofWithPublicValues, SP1ProvingKey};
-use std::sync::Arc;
-use std::time::Instant;
+use std::{str::FromStr, sync::Arc, time::Instant};
 use tracing::{error, info};
+use zkevm_storage::hyperlane::{
+    StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore,
+};
 pub mod config;
+mod hyperlane;
 use config::ProverConfig;
 
 const LIGHTCLIENT_ELF: &[u8] = include_bytes!("../../../elfs/helios");
+pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
 
 pub struct SP1HeliosOperator {
-    client: Arc<EnvProver>,
+    client: Arc<NetworkProver>,
     lightclient_pk: Arc<SP1ProvingKey>,
     config: ProverConfig,
 }
@@ -93,7 +109,10 @@ impl SP1HeliosOperator {
 
     /// Create a new SP1 Helios operator.
     pub async fn new(config: ProverConfig) -> Self {
-        let client = ProverClient::from_env();
+        let client = ProverClient::builder()
+            .network_for(NetworkMode::Mainnet)
+            .rpc_url("https://rpc.mainnet.succinct.xyz")
+            .build();
 
         tracing::info!("Setting up light client program...");
         let (lightclient_pk, _) = client.setup(LIGHTCLIENT_ELF);
@@ -155,6 +174,11 @@ impl SP1HeliosOperator {
         tracing_subscriber::fmt().with_env_filter(filter).init();
         let (_, helios_vk) = self.client.setup(LIGHTCLIENT_ELF);
         let (_, wrapper_vk) = self.client.setup(WRAPPER_ELF);
+        let prover_client = ProverClient::builder()
+            .network_for(NetworkMode::Mainnet)
+            .rpc_url("https://rpc.mainnet.succinct.xyz")
+            .build();
+        let (hyperlane_pk, hyperlane_vk) = prover_client.setup(EV_HYPERLANE_ELF);
         let ism_client = CelestiaIsmClient::new(ClientConfig::from_env()?).await?;
 
         info!("Starting service...");
@@ -169,6 +193,22 @@ impl SP1HeliosOperator {
             let ism = verifier_response.unwrap().ism.unwrap();
             active_trusted_state = Some(bincode::deserialize(&ism.state).unwrap());
         }
+
+        let storage_path = dirs::home_dir()
+            .expect("cannot find home directory")
+            .join(".ev-prover")
+            .join("data");
+
+        let hyperlane_message_store =
+            Arc::new(HyperlaneMessageStore::new(storage_path.clone()).unwrap());
+        let snapshot_store = Arc::new(HyperlaneSnapshotStore::new(storage_path, None).unwrap());
+
+        let evm_provider = ProviderBuilder::new()
+            .connect_http(Url::parse("https://rpc.ankr.com/eth_sepolia/3021010a3fb9fc2c849dc6bd38774dbd248c4df99be6c8aa2d6841f308b95230").unwrap());
+
+        let mut indexer_height = 9000000;
+        let mut trusted_execution_block_number = 1;
+
         // if no trusted state, generate Helios proof, install Verifier
         // if trusted state, supply trusted state to wrapper, alongside new Helios proof
         // submit wrapped proof with outputs to Verifier => update state transition
@@ -213,13 +253,19 @@ impl SP1HeliosOperator {
                             groth16_vkey: GROTH16_VK.to_vec(),
                             state_transition_vkey: wrapper_vk.vk.bytes32_raw().to_vec(),
                             // todo: replace with actual state membership vkey
-                            state_membership_vkey: wrapper_vk.vk.bytes32_raw().to_vec(),
+                            state_membership_vkey: hyperlane_vk.vk.bytes32_raw().to_vec(),
                         };
                         let response = ism_client.send_tx(create_message).await?;
+                        if !response.success {
+                            error!("Failed to create ISM: {:?}", response);
+                            return Err(anyhow::anyhow!("Failed to create ISM"));
+                        }
                         info!("Transaction submitted: {:?}", response);
 
                         // udpate trusted state
                         trusted_head = initial_trusted_state.new_head;
+                        trusted_execution_block_number =
+                            initial_trusted_state.execution_block_number;
                         active_trusted_state = Some(initial_trusted_state);
                     }
                     Ok(None) => {
@@ -275,6 +321,10 @@ impl SP1HeliosOperator {
                             proof.public_values.to_vec().len()
                         );
                         let response = ism_client.send_tx(update_message).await?;
+                        if !response.success {
+                            error!("Failed to update ISM: {:?}", response);
+                            return Err(anyhow::anyhow!("Failed to update ISM"));
+                        }
                         println!("Response: {:?}", response);
                         let verifier_response = ism_client
                             .verifier(QueryIsmRequest {
@@ -287,6 +337,7 @@ impl SP1HeliosOperator {
                         let trusted_state: TrustedState = bincode::deserialize(&ism.state).unwrap();
                         info!("Verifier Trusted State: {:?}", trusted_state);
                         trusted_head = trusted_state.new_head;
+                        trusted_execution_block_number = trusted_state.execution_block_number;
                         active_trusted_state = Some(trusted_state);
                     }
                     Ok(None) => {
@@ -297,7 +348,99 @@ impl SP1HeliosOperator {
                     }
                 }
             }
+            // generate hyperlane message proof for range previous_trusted_height+1..=new_trusted_height
+            // and submit it to the ISM
+            println!(
+                "Indexing messages from height {} to {}",
+                indexer_height, trusted_head
+            );
+
+            hyperlane::index_sepolia(
+                indexer_height,
+                trusted_execution_block_number,
+                hyperlane_message_store.clone(),
+                evm_provider.clone().into(),
+            )
+            .await;
+
+            // prove and submit indexed messages
+            let mut messages: Vec<StoredHyperlaneMessage> = Vec::new();
+            for block in indexer_height..=trusted_execution_block_number {
+                messages.extend(hyperlane_message_store.get_by_block(block)?);
+            }
+
+            if messages.is_empty() {
+                println!("No new messages found");
+                break;
+            }
+
+            let keys: Vec<FixedBytes<32>> = HYPERLANE_MERKLE_TREE_KEYS
+                .iter()
+                .map(|k| {
+                    FixedBytes::from_hex(k)
+                        .map_err(|e| anyhow::anyhow!("Failed to parse fixed bytes: {e}"))
+                })
+                .collect::<Result<Vec<_>>>()?;
+
+            let merkle_proof = evm_provider
+                .get_proof(
+                    Address::from_str("0xA82571C75164B76721C4047182b73014072E3D9B").unwrap(),
+                    keys,
+                )
+                .block_id(trusted_execution_block_number.into())
+                .await?;
+
+            let branch_proof = HyperlaneBranchProof::new(merkle_proof);
+
+            let snapshot = snapshot_store
+                .get_snapshot(snapshot_store.current_index().unwrap())
+                .unwrap();
+
+            // Construct program inputs from values
+            let input = HyperlaneMessageInputs::new(
+                hex::encode(active_trusted_state.clone().unwrap().execution_state_root),
+                Address::from_str("0xA82571C75164B76721C4047182b73014072E3D9B")
+                    .unwrap()
+                    .to_string(),
+                messages.clone().into_iter().map(|m| m.message).collect(),
+                HyperlaneBranchProofInputs::from(branch_proof),
+                snapshot.tree.clone(),
+            );
+
+            let mut stdin = SP1Stdin::new();
+            stdin.write(&input);
+            let proof = prover_client.prove(&hyperlane_pk, &stdin).groth16().run()?;
+
+            // submit proof to ZKISM verifier
+            // Prepare the proof submission message
+            let message_proof_msg = MsgSubmitMessages::new(
+                "0x726f757465725f69736d000000000000000000000000002a0000000000000000".to_string(),
+                trusted_head,
+                proof.bytes(),
+                proof.public_values.to_vec(),
+                ism_client.signer_address().to_string(),
+            );
+
+            // Submit the proof to ZKISM
+            info!("Submitting Hyperlane tree proof to ZKISM...");
+            let response = ism_client.send_tx(message_proof_msg).await?;
+            if !response.success {
+                error!(
+                    "Failed to submit Hyperlane tree proof to ZKISM: {:?}",
+                    response
+                );
+                return Err(anyhow::anyhow!(
+                    "Failed to submit Hyperlane tree proof to ZKISM"
+                ));
+            }
+
+            // exit now because we don't maintain a snapshot
+            break;
+
+            // continue
+            indexer_height = trusted_head + 1;
         }
+        Ok(())
     }
 }
 

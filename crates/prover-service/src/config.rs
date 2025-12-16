@@ -15,7 +15,7 @@ impl Default for ProverConfig {
         Self {
             consensus_rpc_url: "https://ethereum-sepolia-beacon-api.publicnode.com".to_string(),
             chain_id: 11155111,
-            trusted_head: 9020544,
+            trusted_head: 9178624,
             verifier_id: "0x726f757465725f69736d000000000000000000000000002a0000000000000000"
                 .to_string(),
             log_filter: "sp1_core=warn,sp1_runtime=warn,sp1_sdk=warn,sp1_vm=warn".to_string(),

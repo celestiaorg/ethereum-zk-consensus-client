@@ -1,0 +1,9 @@
+[package]
+name = "ev-hyperlane-program"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+alloy-primitives.workspace = true
+ev-zkevm-types.workspace = true
+sp1-zkvm.workspace = true
