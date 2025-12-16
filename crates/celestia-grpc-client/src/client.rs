@@ -3,7 +3,7 @@ use crate::proto::celestia::zkism::v1::{
     query_client::QueryClient, QueryIsmRequest, QueryIsmResponse, QueryIsmsRequest,
     QueryIsmsResponse,
 };
-use crate::types::{ClientConfig, TxResponse};
+use crate::types::{ClientConfig, TxResponse, TypedTxResponse};
 
 use anyhow::Context;
 use celestia_grpc::{GrpcClient, IntoProtobufAny};
@@ -139,6 +139,7 @@ impl CelestiaIsmClient {
                     gas_used: 0, // TxInfo doesn't provide gas_used, use estimation
                     success: true,
                     error_message: None,
+                    data: None,
                 })
             }
             Err(e) => {
@@ -149,6 +150,159 @@ impl CelestiaIsmClient {
             }
         }
     }
+
+    /// Sign and send a tx to Celestia and decode the typed response.
+    ///
+    /// This method queries the transaction after broadcast to retrieve the response data
+    /// and decodes it into the expected response type.
+    pub async fn send_tx_typed<M, R>(&self, message: M) -> Result<TypedTxResponse<R>>
+    where
+        M: Message + IntoProtobufAny + Send + Clone + 'static,
+        R: Message + Default,
+    {
+        let message_type = message.clone().into_any().type_url;
+        debug!(
+            "Submitting {} message to Celestia (endpoint: {}, chain: {})",
+            message_type, self.config.grpc_endpoint, self.config.chain_id
+        );
+
+        let tx_config = celestia_grpc::TxConfig {
+            gas_limit: Some(self.config.max_gas),
+            gas_price: Some(self.config.gas_price as f64),
+            memo: Some("celestia-zkism-client".to_string()),
+            ..Default::default()
+        };
+
+        match self.tx_client.submit_message(message, tx_config).await {
+            Ok(tx_info) => {
+                info!(
+                    "Successfully submitted {} message: tx_hash={}, height={}",
+                    message_type,
+                    tx_info.hash,
+                    tx_info.height.value()
+                );
+
+                // Query the transaction to get the response data
+                let tx_result = self.tx_client.get_tx(tx_info.hash).await.map_err(|e| {
+                    IsmClientError::TxFailed(format!("Failed to query tx result: {e}"))
+                })?;
+
+                let data_hex = &tx_result.tx_response.data;
+                let data_bytes = hex::decode(data_hex).map_err(|e| {
+                    IsmClientError::TxFailed(format!("Failed to decode response data hex: {e}"))
+                })?;
+
+                // The data field contains a TxMsgData protobuf which wraps the actual response
+                // For simplicity, we attempt to decode the response directly
+                // In Cosmos SDK, the data is typically: TxMsgData { msg_responses: [Any { type_url, value }] }
+                let response = decode_msg_response::<R>(&data_bytes)?;
+
+                Ok(TypedTxResponse {
+                    tx: TxResponse {
+                        tx_hash: tx_info.hash.to_string(),
+                        height: tx_info.height.value(),
+                        gas_used: 0,
+                        success: true,
+                        error_message: None,
+                        data: Some(data_hex.clone()),
+                    },
+                    response,
+                })
+            }
+            Err(e) => {
+                warn!("Failed to submit {} message: {}", message_type, e);
+                Err(IsmClientError::TxFailed(format!(
+                    "Failed to submit {message_type}: {e}"
+                )))
+            }
+        }
+    }
+}
+
+/// Decode the message response from TxMsgData bytes.
+///
+/// In Cosmos SDK, the tx response data contains a TxMsgData protobuf:
+/// ```protobuf
+/// message TxMsgData {
+///   repeated Any msg_responses = 2;
+/// }
+/// ```
+fn decode_msg_response<R: Message + Default>(data: &[u8]) -> Result<R> {
+    use prost::bytes::Bytes;
+
+    // TxMsgData structure (simplified inline decoding)
+    // Field 2 (msg_responses) is a repeated Any
+    // Each Any has: field 1 = type_url (string), field 2 = value (bytes)
+
+    let mut cursor = data;
+
+    // Skip through the protobuf looking for field 2 (msg_responses)
+    while !cursor.is_empty() {
+        let (field_number, wire_type) = prost::encoding::decode_key(&mut cursor)
+            .map_err(|e| IsmClientError::TxFailed(format!("Failed to decode protobuf key: {e}")))?;
+
+        if field_number == 2 {
+            // This is msg_responses (length-delimited Any)
+            let len = prost::encoding::decode_varint(&mut cursor)
+                .map_err(|e| IsmClientError::TxFailed(format!("Failed to decode length: {e}")))?
+                as usize;
+
+            if cursor.len() < len {
+                return Err(IsmClientError::TxFailed(
+                    "Invalid protobuf: not enough bytes".to_string(),
+                ));
+            }
+
+            let any_bytes = &cursor[..len];
+
+            // Parse the Any message to extract the value field (field 2)
+            let mut any_cursor = any_bytes;
+            while !any_cursor.is_empty() {
+                let (any_field, any_wire) =
+                    prost::encoding::decode_key(&mut any_cursor).map_err(|e| {
+                        IsmClientError::TxFailed(format!("Failed to decode Any key: {e}"))
+                    })?;
+
+                if any_field == 2 && any_wire == prost::encoding::WireType::LengthDelimited {
+                    // This is the value field containing the actual response
+                    let value_len =
+                        prost::encoding::decode_varint(&mut any_cursor).map_err(|e| {
+                            IsmClientError::TxFailed(format!("Failed to decode value length: {e}"))
+                        })? as usize;
+
+                    if any_cursor.len() < value_len {
+                        return Err(IsmClientError::TxFailed(
+                            "Invalid protobuf: not enough bytes for value".to_string(),
+                        ));
+                    }
+
+                    let value_bytes = &any_cursor[..value_len];
+                    return R::decode(Bytes::copy_from_slice(value_bytes)).map_err(|e| {
+                        IsmClientError::TxFailed(format!("Failed to decode response: {e}"))
+                    });
+                } else {
+                    // Skip this field
+                    prost::encoding::skip_field(
+                        any_wire,
+                        any_field,
+                        &mut any_cursor,
+                        Default::default(),
+                    )
+                    .map_err(|e| {
+                        IsmClientError::TxFailed(format!("Failed to skip Any field: {e}"))
+                    })?;
+                }
+            }
+        } else {
+            // Skip this field
+            prost::encoding::skip_field(wire_type, field_number, &mut cursor, Default::default())
+                .map_err(|e| IsmClientError::TxFailed(format!("Failed to skip field: {e}")))?;
+        }
+    }
+
+    Err(IsmClientError::TxFailed(
+        "No msg_response found in TxMsgData".to_string(),
+    ))
 }
 #[cfg(test)]
 mod tests {

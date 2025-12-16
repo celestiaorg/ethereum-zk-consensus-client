@@ -15,6 +15,17 @@ pub struct TxResponse {
     pub success: bool,
     /// Error message if transaction failed
     pub error_message: Option<String>,
+    /// Raw response data bytes (hex-encoded)
+    pub data: Option<String>,
+}
+
+/// A typed transaction response that includes the decoded message response
+#[derive(Debug, Clone)]
+pub struct TypedTxResponse<R> {
+    /// The base transaction response metadata
+    pub tx: TxResponse,
+    /// The decoded message response
+    pub response: R,
 }
 
 /// Configuration for the Celestia proof client

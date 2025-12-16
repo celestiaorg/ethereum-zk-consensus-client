@@ -17,5 +17,5 @@ pub use proto::celestia::zkism::v1::{
     MsgSubmitMessages, MsgSubmitMessagesResponse, QueryIsmRequest,
 };
 pub use proto::hyperlane::core::v1::MsgProcessMessage;
-pub use proto::hyperlane::warp::v1::MsgRemoteTransfer;
-pub use types::TxResponse;
+pub use proto::hyperlane::warp::v1::{MsgCreateSyntheticTokenResponse, MsgRemoteTransfer};
+pub use types::{TxResponse, TypedTxResponse};

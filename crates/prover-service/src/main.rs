@@ -6,16 +6,31 @@ use alloy::{
 use alloy_primitives::{Address, FixedBytes};
 use anyhow::Result;
 use celestia_grpc_client::{
-    CelestiaIsmClient, MsgSubmitMessages,
-    proto::celestia::zkism::v1::{
-        MsgCreateInterchainSecurityModule, MsgUpdateInterchainSecurityModule, QueryIsmRequest,
+    CelestiaIsmClient, MsgCreateSyntheticTokenResponse, MsgProcessMessage, MsgSubmitMessages,
+    MsgSubmitMessagesResponse,
+    proto::{
+        celestia::zkism::v1::{
+            MsgCreateInterchainSecurityModule, MsgCreateInterchainSecurityModuleResponse,
+            MsgUpdateInterchainSecurityModule, MsgUpdateInterchainSecurityModuleResponse,
+            QueryIsmRequest,
+        },
+        hyperlane::{
+            core::v1::{MsgCreateMailbox, MsgCreateMailboxResponse, MsgProcessMessageResponse},
+            warp::v1::{
+                MsgCreateSyntheticToken, MsgEnrollRemoteRouter, MsgEnrollRemoteRouterResponse,
+                RemoteRouter,
+            },
+        },
     },
     types::ClientConfig,
 };
 use core::panic;
-use ev_zkevm_types::programs::hyperlane::types::{
-    HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs,
-    HyperlaneMessageInputs,
+use ev_zkevm_types::{
+    hyperlane::encode_hyperlane_message,
+    programs::hyperlane::types::{
+        HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs,
+        HyperlaneMessageInputs,
+    },
 };
 use helios_consensus_core::consensus_spec::MainnetConsensusSpec;
 use helios_ethereum::{consensus::Inner, rpc::ConsensusRpc, rpc::http_rpc::HttpRpc};
@@ -184,7 +199,7 @@ impl SP1HeliosOperator {
         Ok(())
     }
 
-    pub async fn start_service(&self) -> Result<()> {
+    pub async fn run(&self) -> Result<()> {
         let mut filter = EnvFilter::new(self.config.log_filter());
         if let Ok(env_filter) = std::env::var("RUST_LOG")
             && let Ok(parsed) = env_filter.parse()
@@ -227,10 +242,14 @@ impl SP1HeliosOperator {
         let mut indexer_height = 9000000;
         let mut trusted_execution_block_number = 1;
 
-        // if no trusted state, generate Helios proof, install Verifier
-        // if trusted state, supply trusted state to wrapper, alongside new Helios proof
-        // submit wrapped proof with outputs to Verifier => update state transition
+        // initialize hyperlane contracts
+        //self.hyperlane_init().await?;
+
+        /////////////////////
+        //// Prover Loop ////
+        /////////////////////
         loop {
+            // If this is the first proof, deploy the ISM
             if active_trusted_state.is_none() {
                 let consensus_client = get_client(
                     Some(self.config.trusted_head()),
@@ -273,11 +292,16 @@ impl SP1HeliosOperator {
                             // todo: replace with actual state membership vkey
                             state_membership_vkey: hyperlane_vk.vk.bytes32_raw().to_vec(),
                         };
-                        let response = ism_client.send_tx(create_message).await?;
-                        if !response.success {
+                        let response = ism_client
+                            .send_tx_typed::<_, MsgCreateInterchainSecurityModuleResponse>(
+                                create_message,
+                            )
+                            .await?;
+                        if !response.tx.success {
                             error!("Failed to create ISM: {:?}", response);
                             return Err(anyhow::anyhow!("Failed to create ISM"));
                         }
+                        info!("Created ISM with id: {:?}", response.response.id);
                         info!("Transaction submitted: {:?}", response);
 
                         // udpate trusted state
@@ -293,6 +317,7 @@ impl SP1HeliosOperator {
                         error!("Header range request failed: {}", e);
                     }
                 }
+            // If this is not the first proof, update the ISM
             } else {
                 let trusted_state = active_trusted_state.clone().unwrap();
                 let consensus_client = get_client(
@@ -337,9 +362,13 @@ impl SP1HeliosOperator {
                             signer: ism_client.signer_address().to_string(),
                         };
 
-                        let response = ism_client.send_tx(update_message).await?;
+                        let response = ism_client
+                            .send_tx_typed::<_, MsgUpdateInterchainSecurityModuleResponse>(
+                                update_message,
+                            )
+                            .await?;
                         debug!("Response: {:?}", response);
-                        if !response.success {
+                        if !response.tx.success {
                             error!("Failed to update ISM: {:?}", response);
                             return Err(anyhow::anyhow!("Failed to update ISM"));
                         }
@@ -442,8 +471,10 @@ impl SP1HeliosOperator {
 
             // Submit the proof to ZKISM
             info!("Submitting Hyperlane tree proof to ZKISM...");
-            let response = ism_client.send_tx(message_proof_msg).await?;
-            if !response.success {
+            let response = ism_client
+                .send_tx_typed::<_, MsgSubmitMessagesResponse>(message_proof_msg)
+                .await?;
+            if !response.tx.success {
                 error!(
                     "Failed to submit Hyperlane tree proof to ZKISM: {:?}",
                     response
@@ -460,7 +491,96 @@ impl SP1HeliosOperator {
             }
             snapshot_store.insert_snapshot(snapshot_store.current_index()? + 1, new_snapshot)?;
             indexer_height = trusted_execution_block_number + 1;
+
+            // relay messages to hyperlane remote router
+            for message in messages.clone() {
+                let message_hex = alloy::hex::encode(encode_hyperlane_message(&message.message)?);
+                let msg = MsgProcessMessage::new(
+                    self.config.mailbox_address.clone(),
+                    ism_client.signer_address().to_string(),
+                    // empty metadata; messages are pre-authorized before submission
+                    alloy::hex::encode(vec![]),
+                    message_hex,
+                );
+
+                let response = ism_client
+                    .send_tx_typed::<_, MsgProcessMessageResponse>(msg)
+                    .await?;
+                if !response.tx.success {
+                    error!(
+                        "Failed to relay Hyperlane message to Celestia: {:?}",
+                        response
+                    );
+                    return Err(anyhow::anyhow!(
+                        "Failed to relay Hyperlane message to Celestia"
+                    ));
+                }
+                info!(
+                    "Successfully submitted Hyperlane message with id {} to Celestia",
+                    message.message.id()
+                );
+            }
         }
+    }
+
+    async fn hyperlane_init(&self) -> Result<()> {
+        // first step: create the mailbox
+        // second step: deploy the warp token
+        // third step: set the ISM on the warp token
+        // fourth step: enroll the remote router
+        let ism_client = CelestiaIsmClient::new(ClientConfig::from_env()?).await?;
+        let mailbox_create_message = MsgCreateMailbox {
+            owner: ism_client.signer_address().to_string(),
+            local_domain: 69420,
+            default_ism: self.config.verifier_id().to_string(),
+            default_hook: "".to_string(),
+            required_hook: "".to_string(),
+        };
+        let synthetic_token_create_message = MsgCreateSyntheticToken {
+            owner: self.config.mailbox_address.clone(),
+            origin_mailbox: self.config.mailbox_address.clone(),
+        };
+        let remote_router_enroll_message = MsgEnrollRemoteRouter {
+            owner: ism_client.signer_address().to_string(),
+            token_id: "".to_string(),
+            remote_router: Some(RemoteRouter {
+                receiver_domain: 11155111,
+                // the token contract on Ethereum
+                receiver_contract: "0x0a7c0F5db1f662Ce262f7d2Dcf319CE63df44e12".to_string(),
+                gas: "0".to_string(),
+            }),
+        };
+        let resp = ism_client
+            .send_tx_typed::<_, MsgCreateMailboxResponse>(mailbox_create_message)
+            .await?;
+        if !resp.tx.success {
+            error!("Failed to create mailbox: {:?}", resp);
+            return Err(anyhow::anyhow!("Failed to create mailbox"));
+        }
+
+        let synthetic_token_response = ism_client
+            .send_tx_typed::<_, MsgCreateSyntheticTokenResponse>(synthetic_token_create_message)
+            .await?;
+        if !synthetic_token_response.tx.success {
+            error!(
+                "Failed to create synthetic token: {:?}",
+                synthetic_token_response.tx
+            );
+            return Err(anyhow::anyhow!("Failed to create synthetic token"));
+        }
+        info!(
+            "Created synthetic token with id: {}",
+            synthetic_token_response.response.id
+        );
+
+        let resp = ism_client
+            .send_tx_typed::<_, MsgEnrollRemoteRouterResponse>(remote_router_enroll_message)
+            .await?;
+        if !resp.tx.success {
+            error!("Failed to enroll remote router: {:?}", resp);
+            return Err(anyhow::anyhow!("Failed to enroll remote router"));
+        }
+        Ok(())
     }
 }
 
@@ -474,5 +594,5 @@ async fn main() {
     let config = ProverConfig::from_env().unwrap();
     let operator = SP1HeliosOperator::new(config).await;
     info!("Starting service...");
-    operator.start_service().await.unwrap();
+    operator.run().await.unwrap();
 }

@@ -3,7 +3,10 @@ use crate::{
         celestia::zkism::v1::{
             MsgCreateInterchainSecurityModule, MsgUpdateInterchainSecurityModule,
         },
-        hyperlane::warp::v1::MsgSetToken,
+        hyperlane::{
+            core::v1::MsgCreateMailbox,
+            warp::v1::{MsgCreateSyntheticToken, MsgEnrollRemoteRouter, MsgSetToken},
+        },
     },
     MsgProcessMessage, MsgRemoteTransfer, MsgSubmitMessages,
 };
@@ -110,5 +113,20 @@ impl MsgRemoteTransfer {
 
 impl Name for MsgRemoteTransfer {
     const NAME: &'static str = "MsgRemoteTransfer";
+    const PACKAGE: &'static str = "hyperlane.warp.v1";
+}
+
+impl Name for MsgCreateMailbox {
+    const NAME: &'static str = "MsgCreateMailbox";
+    const PACKAGE: &'static str = "hyperlane.core.v1";
+}
+
+impl Name for MsgEnrollRemoteRouter {
+    const NAME: &'static str = "MsgEnrollRemoteRouter";
+    const PACKAGE: &'static str = "hyperlane.warp.v1";
+}
+
+impl Name for MsgCreateSyntheticToken {
+    const NAME: &'static str = "MsgCreateSyntheticToken";
     const PACKAGE: &'static str = "hyperlane.warp.v1";
 }
