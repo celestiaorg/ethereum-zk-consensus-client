@@ -22,6 +22,25 @@ support Risc0 by ignoring the versioning.
 For generic (non-ZKVM) Groth16 proofs, we will have to extend the implementation to handle cases where there is just one verifying key and call the 
 Groth16 verifier directly. However it seems likely that most ZK light client that we will integrate use SP1, Risc0 or another ZKVM that has a dual verifying-key requirement.
 
+## Deployments
+### Sepolia
+
+| Contract Name | Address |
+|--|--|
+| domainRoutingIsmFactory | 0xBB9A8711EfAAF49A8bf060F2D0A6341C5c352838 |
+| mailbox | 0xC591542b7C43f1E79Df47526F7459Ed609Aff2a3 |
+| merkleTreeHook | 0xA82571C75164B76721C4047182b73014072E3D9B |
+| proxyAdmin | 0xF16558A84483C471Aa589Ef337414Ff0C8d93358 |
+| staticAggregationHookFactory | 0xF9d4F726FB05AED56A58D0C5E0c16CEaAE7F37e5 |
+| staticAggregationIsmFactory | 0x083A11101c4003b3E5d56cEE2dAdA2ba95a2393b |
+| staticMerkleRootMultisigIsmFactory | 0x62139DC56A302b869F681e5272F5e90AD23b6D24 |
+| staticMerkleRootWeightedMultisigIsmFactory | 0xbf1eF820C0Fe9CBCA51a9640d98aCf35205C6805 |
+| staticMessageIdMultisigIsmFactory | 0xA0ca6F96BbFF5951752EB1E9c890d7Ee844454c8 |
+| staticMessageIdWeightedMultisigIsmFactory | 0xCC2bAea9092f0D027434D1BbF5b786a812671b8A | 
+| testRecipient | 0xdFa2514265631d3aAb6A2a416bc524b44809Ec4b | 
+| validatorAnnounce | 0xf042c4bd2d15c060359014c9E16dDF226dc33561 |
+
+
 ## Implementation
 
 ### Mock Circuit
