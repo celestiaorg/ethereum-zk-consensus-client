@@ -231,5 +231,18 @@ pub struct MsgUpdateParams {
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct MsgUpdateParamsResponse {
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MsgCreateNoopHook {
+    /// owner is the address that controls the hook
+    #[prost(string, tag="1")]
+    pub owner: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MsgCreateNoopHookResponse {
+    #[prost(string, tag="1")]
+    pub id: ::prost::alloc::string::String,
+}
 include!("celestia.zkism.v1.tonic.rs");
 // @@protoc_insertion_point(module)

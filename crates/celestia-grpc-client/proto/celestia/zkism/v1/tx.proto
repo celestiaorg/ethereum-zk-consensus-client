@@ -108,3 +108,13 @@ message MsgUpdateParams {
 
 // MsgUpdateParamsResponse defines the response type for UpdateParams.
 message MsgUpdateParamsResponse {};
+
+message MsgCreateNoopHook{
+  option (cosmos.msg.v1.signer) = "owner";
+  // owner is the address that controls the hook
+  string owner = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+};
+
+message MsgCreateNoopHookResponse{
+  string id = 1;
+}

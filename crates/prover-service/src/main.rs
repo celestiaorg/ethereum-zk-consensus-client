@@ -11,8 +11,8 @@ use celestia_grpc_client::{
     proto::{
         celestia::zkism::v1::{
             MsgCreateInterchainSecurityModule, MsgCreateInterchainSecurityModuleResponse,
-            MsgUpdateInterchainSecurityModule, MsgUpdateInterchainSecurityModuleResponse,
-            QueryIsmRequest,
+            MsgCreateNoopHook, MsgCreateNoopHookResponse, MsgUpdateInterchainSecurityModule,
+            MsgUpdateInterchainSecurityModuleResponse, QueryIsmRequest,
         },
         hyperlane::{
             core::v1::{MsgCreateMailbox, MsgCreateMailboxResponse, MsgProcessMessageResponse},
@@ -529,34 +529,40 @@ impl SP1HeliosOperator {
         // third step: set the ISM on the warp token
         // fourth step: enroll the remote router
         let ism_client = CelestiaIsmClient::new(ClientConfig::from_env()?).await?;
+
+        let create_noop_hook_message = MsgCreateNoopHook {
+            owner: ism_client.signer_address().to_string(),
+        };
+
+        let create_noop_hook_response = ism_client
+            .send_tx_typed::<_, MsgCreateNoopHookResponse>(create_noop_hook_message)
+            .await?;
+
+        if !create_noop_hook_response.tx.success {
+            error!(
+                "Failed to create noop hook: {:?}",
+                create_noop_hook_response
+            );
+            return Err(anyhow::anyhow!("Failed to create noop hook"));
+        }
+
+        info!(
+            "Created noop hook with id: {:?}",
+            create_noop_hook_response.response.id
+        );
+
         let mailbox_create_message = MsgCreateMailbox {
             owner: ism_client.signer_address().to_string(),
             local_domain: 69420,
             default_ism: self.config.verifier_id().to_string(),
-            default_hook: "".to_string(),
-            required_hook: "".to_string(),
+            default_hook: create_noop_hook_response.response.id.clone(),
+            required_hook: create_noop_hook_response.response.id,
         };
+
         let synthetic_token_create_message = MsgCreateSyntheticToken {
             owner: self.config.mailbox_address.clone(),
             origin_mailbox: self.config.mailbox_address.clone(),
         };
-        let remote_router_enroll_message = MsgEnrollRemoteRouter {
-            owner: ism_client.signer_address().to_string(),
-            token_id: "".to_string(),
-            remote_router: Some(RemoteRouter {
-                receiver_domain: 11155111,
-                // the token contract on Ethereum
-                receiver_contract: "0x0a7c0F5db1f662Ce262f7d2Dcf319CE63df44e12".to_string(),
-                gas: "0".to_string(),
-            }),
-        };
-        let resp = ism_client
-            .send_tx_typed::<_, MsgCreateMailboxResponse>(mailbox_create_message)
-            .await?;
-        if !resp.tx.success {
-            error!("Failed to create mailbox: {:?}", resp);
-            return Err(anyhow::anyhow!("Failed to create mailbox"));
-        }
 
         let synthetic_token_response = ism_client
             .send_tx_typed::<_, MsgCreateSyntheticTokenResponse>(synthetic_token_create_message)
@@ -568,10 +574,30 @@ impl SP1HeliosOperator {
             );
             return Err(anyhow::anyhow!("Failed to create synthetic token"));
         }
+
         info!(
             "Created synthetic token with id: {}",
             synthetic_token_response.response.id
         );
+
+        let remote_router_enroll_message = MsgEnrollRemoteRouter {
+            owner: ism_client.signer_address().to_string(),
+            token_id: synthetic_token_response.response.id,
+            remote_router: Some(RemoteRouter {
+                receiver_domain: 11155111,
+                // the token contract on Ethereum
+                receiver_contract: "0x0a7c0F5db1f662Ce262f7d2Dcf319CE63df44e12".to_string(),
+                gas: "0".to_string(),
+            }),
+        };
+
+        let resp = ism_client
+            .send_tx_typed::<_, MsgCreateMailboxResponse>(mailbox_create_message)
+            .await?;
+        if !resp.tx.success {
+            error!("Failed to create mailbox: {:?}", resp);
+            return Err(anyhow::anyhow!("Failed to create mailbox"));
+        }
 
         let resp = ism_client
             .send_tx_typed::<_, MsgEnrollRemoteRouterResponse>(remote_router_enroll_message)

@@ -1,7 +1,7 @@
 use crate::{
     proto::{
         celestia::zkism::v1::{
-            MsgCreateInterchainSecurityModule, MsgUpdateInterchainSecurityModule,
+            MsgCreateInterchainSecurityModule, MsgCreateNoopHook, MsgUpdateInterchainSecurityModule,
         },
         hyperlane::{
             core::v1::MsgCreateMailbox,
@@ -129,4 +129,9 @@ impl Name for MsgEnrollRemoteRouter {
 impl Name for MsgCreateSyntheticToken {
     const NAME: &'static str = "MsgCreateSyntheticToken";
     const PACKAGE: &'static str = "hyperlane.warp.v1";
+}
+
+impl Name for MsgCreateNoopHook {
+    const NAME: &'static str = "MsgCreateNoopHook";
+    const PACKAGE: &'static str = "hyperlane.core.v1";
 }
