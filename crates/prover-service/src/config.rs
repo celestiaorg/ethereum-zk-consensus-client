@@ -3,17 +3,19 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProverConfig {
-    consensus_rpc_url: String,
-    chain_id: u64,
-    trusted_head: u64,
-    verifier_id: String,
-    log_filter: String,
+    pub consensus_rpc_url: String,
+    pub evm_rpc_url: String,
+    pub chain_id: u64,
+    pub trusted_head: u64,
+    pub verifier_id: String,
+    pub log_filter: String,
 }
 
 impl Default for ProverConfig {
     fn default() -> Self {
         Self {
             consensus_rpc_url: "https://ethereum-sepolia-beacon-api.publicnode.com".to_string(),
+            evm_rpc_url: "https://ethereum-sepolia-rpc.publicnode.com".to_string(),
             chain_id: 11155111,
             trusted_head: 9178624,
             verifier_id: "0x726f757465725f69736d000000000000000000000000002a0000000000000000"
@@ -32,6 +34,8 @@ impl ProverConfig {
         let consensus_rpc_url =
             std::env::var("CONSENSUS_RPC_URL").unwrap_or(defaults.consensus_rpc_url);
 
+        let evm_rpc_url = std::env::var("EVM_RPC_URL").unwrap_or(defaults.evm_rpc_url);
+
         let chain_id = std::env::var("CHAIN_ID")
             .ok()
             .and_then(|s| s.parse().ok())
@@ -48,6 +52,7 @@ impl ProverConfig {
 
         Ok(Self {
             consensus_rpc_url,
+            evm_rpc_url,
             chain_id,
             trusted_head,
             verifier_id,

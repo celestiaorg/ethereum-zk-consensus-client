@@ -16,7 +16,6 @@ use ev_zkevm_types::programs::hyperlane::types::{
     HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs,
     HyperlaneMessageInputs,
 };
-use reqwest::Url;
 use sp1_sdk::{
     HashableKey, Prover, ProverClient, SP1Proof, SP1Stdin, include_elf, network::NetworkMode,
 };
@@ -216,10 +215,9 @@ impl SP1HeliosOperator {
 
         let hyperlane_message_store =
             Arc::new(HyperlaneMessageStore::new(storage_path.clone()).unwrap());
-        let snapshot_store = Arc::new(HyperlaneSnapshotStore::new(storage_path, None).unwrap());
+        let snapshot_store = Arc::new(HyperlaneSnapshotStore::new(storage_path, None)?);
 
-        let evm_provider = ProviderBuilder::new()
-            .connect_http(Url::parse("https://rpc.ankr.com/eth_sepolia/3021010a3fb9fc2c849dc6bd38774dbd248c4df99be6c8aa2d6841f308b95230").unwrap());
+        let evm_provider = ProviderBuilder::new().connect_http(self.config.evm_rpc_url.parse()?);
 
         let mut indexer_height = 9000000;
         let mut trusted_execution_block_number = 1;
@@ -456,7 +454,7 @@ impl SP1HeliosOperator {
                 new_snapshot.tree.insert(message.message.id())?;
             }
             snapshot_store.insert_snapshot(snapshot_store.current_index()? + 1, new_snapshot)?;
-            indexer_height = trusted_head + 1;
+            indexer_height = trusted_execution_block_number + 1;
         }
     }
 }

@@ -43,7 +43,7 @@ async fn test_index_sepolia() {
     use zkevm_storage::hyperlane::StoredHyperlaneMessage;
 
     let evm_provider = ProviderBuilder::new()
-        .connect_http(Url::parse("https://rpc.ankr.com/eth_sepolia/3021010a3fb9fc2c849dc6bd38774dbd248c4df99be6c8aa2d6841f308b95230").unwrap());
+        .connect_http(Url::parse("https://ethereum-sepolia-rpc.publicnode.com").unwrap());
 
     let storage_path = dirs::home_dir()
         .expect("cannot find home directory")
