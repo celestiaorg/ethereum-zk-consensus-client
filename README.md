@@ -1,6 +1,6 @@
 # Generic Groth16 (SP1) Verifier for State Transition and Consensus Proofs
 This repo is a prototype / POC of a generic SP1 proof verifier module that extends [Celestia app](https://github.com/celestiaorg/celestia-app/tree/feat/ethereum-consensus).
-The new branch is based off the [ZKISM branch](https://github.com/celestiaorg/celestia-app/tree/feature/zk-execution-ism) that we created for evolve block proofs and can be found [here](https://github.com/celestiaorg/celestia-app/tree/feat/ethereum-consensus).
+The new branch has been merged into this [ZKISM branch](https://github.com/celestiaorg/celestia-app/tree/feature/zk-execution-ism) 
 
 ## Motivation and Context
 In order for Celestia to become a hub for connecting all sorts of different chains, we must ensure the availability of trusted state roots.
