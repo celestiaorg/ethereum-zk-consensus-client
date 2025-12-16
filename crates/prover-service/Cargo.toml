@@ -4,37 +4,37 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-celestia-grpc-client.workspace = true
-sp1-sdk.workspace = true
-types.workspace = true
-prost.workspace = true
-bincode.workspace = true
-hex.workspace = true
-tokio.workspace = true
-rustls = "0.23.31"
-helios-consensus-core.workspace = true
-helios-ethereum.workspace = true
-sp1-helios-primitives.workspace = true
-sp1-helios-script.workspace = true
-serde.workspace = true
-serde_cbor = { workspace = true }
+alloy = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-trie = { workspace = true }
-alloy = { workspace = true }
 anyhow = { workspace = true }
+bincode.workspace = true
 cargo_metadata = { workspace = true }
-reqwest = { workspace = true }
-tree_hash = { workspace = true }
-serde_json = { workspace = true }
-futures = "0.3.31"
-tracing.workspace = true
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-dotenvy = "0.15.7"
+celestia-grpc-client.workspace = true
 dirs.workspace = true
-zkevm-storage.workspace = true
+dotenvy = "0.15.7"
 ev-state-queries.workspace = true
 ev-zkevm-types.workspace = true
-
+futures = "0.3.31"
+helios-consensus-core.workspace = true
+helios-ethereum.workspace = true
+hex.workspace = true
+prost.workspace = true
+reqwest = { workspace = true }
+rustls = "0.23.31"
+serde.workspace = true
+serde_cbor = { workspace = true }
+serde_json = { workspace = true }
+sp1-helios-primitives.workspace = true
+sp1-helios-script.workspace = true
+sp1-prover.workspace = true
+sp1-sdk.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tree_hash = { workspace = true }
+types.workspace = true
+zkevm-storage.workspace = true
 
 [build-dependencies]
 sp1-build = "=5.2.2"

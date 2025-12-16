@@ -18,8 +18,7 @@ use ev_zkevm_types::programs::hyperlane::types::{
 };
 use reqwest::Url;
 use sp1_sdk::{
-    HashableKey, NetworkProver, Prover, ProverClient, SP1Proof, SP1Stdin, include_elf,
-    network::NetworkMode,
+    HashableKey, Prover, ProverClient, SP1Proof, SP1Stdin, include_elf, network::NetworkMode,
 };
 use tracing_subscriber::EnvFilter;
 use types::{RecursionInput, TrustedState};
@@ -31,9 +30,10 @@ use helios_consensus_core::consensus_spec::MainnetConsensusSpec;
 use helios_ethereum::{consensus::Inner, rpc::ConsensusRpc, rpc::http_rpc::HttpRpc};
 use sp1_helios_primitives::types::{ProofInputs, ProofOutputs};
 use sp1_helios_script::{get_client, get_updates};
-use sp1_sdk::{EnvProver, SP1ProofWithPublicValues, SP1ProvingKey};
+use sp1_prover::components::CpuProverComponents;
+use sp1_sdk::{SP1ProofWithPublicValues, SP1ProvingKey};
 use std::{str::FromStr, sync::Arc, time::Instant};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use zkevm_storage::hyperlane::{
     StoredHyperlaneMessage, message::HyperlaneMessageStore, snapshot::HyperlaneSnapshotStore,
 };
@@ -41,11 +41,13 @@ pub mod config;
 mod hyperlane;
 use config::ProverConfig;
 
+pub type SP1Prover = dyn Prover<CpuProverComponents>;
+
 const LIGHTCLIENT_ELF: &[u8] = include_bytes!("../../../elfs/helios");
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
 
 pub struct SP1HeliosOperator {
-    client: Arc<NetworkProver>,
+    prover_client: Arc<SP1Prover>,
     lightclient_pk: Arc<SP1ProvingKey>,
     config: ProverConfig,
 }
@@ -96,10 +98,10 @@ impl SP1HeliosOperator {
 
         // Generate proof.
         let proof = tokio::task::spawn_blocking({
-            let client = self.client.clone();
+            let client = self.prover_client.clone();
             let pk = self.lightclient_pk.clone();
 
-            move || client.prove(&pk, &stdin).compressed().run()
+            move || client.prove(&pk, &stdin, sp1_sdk::SP1ProofMode::Compressed)
         })
         .await??;
 
@@ -109,16 +111,27 @@ impl SP1HeliosOperator {
 
     /// Create a new SP1 Helios operator.
     pub async fn new(config: ProverConfig) -> Self {
-        let client = ProverClient::builder()
-            .network_for(NetworkMode::Mainnet)
-            .rpc_url("https://rpc.mainnet.succinct.xyz")
-            .build();
+        // read SP1_PROVER from env
+        let sp1_prover = std::env::var("SP1_PROVER").unwrap_or("cpu".to_string());
+        let prover_client: Arc<SP1Prover> = match sp1_prover.as_str() {
+            "network" => Arc::new(
+                ProverClient::builder()
+                    .network_for(NetworkMode::Mainnet)
+                    .rpc_url("https://rpc.mainnet.succinct.xyz")
+                    .build(),
+            ),
+            "cpu" => Arc::new(ProverClient::builder().cpu().build()),
+            _ => panic!(
+                "Unsupported SP1_PROVER: {}, supported modes are network and cpu",
+                sp1_prover
+            ),
+        };
 
         tracing::info!("Setting up light client program...");
-        let (lightclient_pk, _) = client.setup(LIGHTCLIENT_ELF);
+        let (lightclient_pk, _) = prover_client.setup(LIGHTCLIENT_ELF);
 
         let this = Self {
-            client: Arc::new(client),
+            prover_client,
             lightclient_pk: Arc::new(lightclient_pk),
             config,
         };
@@ -154,7 +167,7 @@ impl SP1HeliosOperator {
                 info!("Update proof: {:?}", proof);
             }
             Ok(None) => {
-                // Contract is up to date. Nothing to update.
+                info!("Contract is up to date");
             }
             Err(e) => {
                 error!("Header range request failed: {}", e);
@@ -172,8 +185,8 @@ impl SP1HeliosOperator {
             filter = filter.add_directive(parsed);
         }
         tracing_subscriber::fmt().with_env_filter(filter).init();
-        let (_, helios_vk) = self.client.setup(LIGHTCLIENT_ELF);
-        let (_, wrapper_vk) = self.client.setup(WRAPPER_ELF);
+        let (_, helios_vk) = self.prover_client.setup(LIGHTCLIENT_ELF);
+        let (_, wrapper_vk) = self.prover_client.setup(WRAPPER_ELF);
         let prover_client = ProverClient::builder()
             .network_for(NetworkMode::Mainnet)
             .rpc_url("https://rpc.mainnet.succinct.xyz")
@@ -184,11 +197,13 @@ impl SP1HeliosOperator {
         info!("Starting service...");
         let mut active_trusted_state: Option<TrustedState> = None;
         let mut trusted_head: u64 = self.config.trusted_head();
+
         let verifier_response = ism_client
             .verifier(QueryIsmRequest {
                 id: self.config.verifier_id().to_string(),
             })
             .await;
+
         if verifier_response.is_ok() {
             let ism = verifier_response.unwrap().ism.unwrap();
             active_trusted_state = Some(bincode::deserialize(&ism.state).unwrap());
@@ -291,7 +306,7 @@ impl SP1HeliosOperator {
                 match self.request_update(consensus_client, trusted_head).await {
                     Ok(Some(proof)) => {
                         info!("Wrapping proof to compute Update");
-                        let (pk, _) = self.client.setup(WRAPPER_ELF);
+                        let (pk, _) = self.prover_client.setup(WRAPPER_ELF);
                         let mut stdin = SP1Stdin::new();
                         // write trusted state
                         stdin.write(&trusted_state);
@@ -306,7 +321,11 @@ impl SP1HeliosOperator {
                         stdin.write_proof(*proof.clone(), helios_vk.vk.clone());
                         // generate the wrapped proof
                         let start_time = Instant::now();
-                        let proof = self.client.prove(&pk, &stdin).groth16().run()?;
+                        let proof = self.prover_client.prove(
+                            &pk,
+                            &stdin,
+                            sp1_sdk::SP1ProofMode::Groth16,
+                        )?;
                         info!("Elapsed: {:?}", start_time.elapsed().as_millis());
                         let update_message = MsgUpdateInterchainSecurityModule {
                             id: self.config.verifier_id().to_string(),
@@ -315,17 +334,13 @@ impl SP1HeliosOperator {
                             signer: ism_client.signer_address().to_string(),
                         };
 
-                        println!(
-                            "Public values: {:?}, length: {}",
-                            proof.public_values.to_vec(),
-                            proof.public_values.to_vec().len()
-                        );
                         let response = ism_client.send_tx(update_message).await?;
+                        debug!("Response: {:?}", response);
                         if !response.success {
                             error!("Failed to update ISM: {:?}", response);
                             return Err(anyhow::anyhow!("Failed to update ISM"));
                         }
-                        println!("Response: {:?}", response);
+
                         let verifier_response = ism_client
                             .verifier(QueryIsmRequest {
                                 id: self.config.verifier_id().to_string(),
@@ -335,7 +350,8 @@ impl SP1HeliosOperator {
 
                         let ism = verifier_response.ism.unwrap();
                         let trusted_state: TrustedState = bincode::deserialize(&ism.state).unwrap();
-                        info!("Verifier Trusted State: {:?}", trusted_state);
+                        debug!("Verifier Trusted State: {:?}", trusted_state);
+
                         trusted_head = trusted_state.new_head;
                         trusted_execution_block_number = trusted_state.execution_block_number;
                         active_trusted_state = Some(trusted_state);
@@ -350,7 +366,7 @@ impl SP1HeliosOperator {
             }
             // generate hyperlane message proof for range previous_trusted_height+1..=new_trusted_height
             // and submit it to the ISM
-            println!(
+            info!(
                 "Indexing messages from height {} to {}",
                 indexer_height, trusted_head
             );
@@ -361,7 +377,7 @@ impl SP1HeliosOperator {
                 hyperlane_message_store.clone(),
                 evm_provider.clone().into(),
             )
-            .await;
+            .await?;
 
             // prove and submit indexed messages
             let mut messages: Vec<StoredHyperlaneMessage> = Vec::new();
@@ -370,8 +386,8 @@ impl SP1HeliosOperator {
             }
 
             if messages.is_empty() {
-                println!("No new messages found");
-                break;
+                info!("No new messages found");
+                continue;
             }
 
             let keys: Vec<FixedBytes<32>> = HYPERLANE_MERKLE_TREE_KEYS
@@ -384,7 +400,7 @@ impl SP1HeliosOperator {
 
             let merkle_proof = evm_provider
                 .get_proof(
-                    Address::from_str("0xA82571C75164B76721C4047182b73014072E3D9B").unwrap(),
+                    Address::from_str("0xA82571C75164B76721C4047182b73014072E3D9B")?,
                     keys,
                 )
                 .block_id(trusted_execution_block_number.into())
@@ -393,7 +409,7 @@ impl SP1HeliosOperator {
             let branch_proof = HyperlaneBranchProof::new(merkle_proof);
 
             let snapshot = snapshot_store
-                .get_snapshot(snapshot_store.current_index().unwrap())
+                .get_snapshot(snapshot_store.current_index()?)
                 .unwrap();
 
             // Construct program inputs from values
@@ -434,13 +450,14 @@ impl SP1HeliosOperator {
                 ));
             }
 
-            // exit now because we don't maintain a snapshot
-            break;
-
-            // continue
+            // update snapshot
+            let mut new_snapshot = snapshot.clone();
+            for message in messages.clone() {
+                new_snapshot.tree.insert(message.message.id())?;
+            }
+            snapshot_store.insert_snapshot(snapshot_store.current_index()? + 1, new_snapshot)?;
             indexer_height = trusted_head + 1;
         }
-        Ok(())
     }
 }
 
@@ -450,7 +467,8 @@ async fn main() {
         .install_default()
         .expect("Failed to set default crypto provider");
 
-    let config = ProverConfig::from_env().expect("Failed to load configuration");
+    dotenvy::dotenv().ok();
+    let config = ProverConfig::from_env().unwrap();
     let operator = SP1HeliosOperator::new(config).await;
     info!("Starting service...");
     operator.start_service().await.unwrap();

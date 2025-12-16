@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-sp1-zkvm = { workspace = true }
-sp1-helios-primitives.workspace = true
-types.workspace = true
 bincode.workspace = true
 serde = { version = "1.0", features = ["derive"] }
+sp1-helios-primitives.workspace = true
+sp1-zkvm = { workspace = true }
+types.workspace = true

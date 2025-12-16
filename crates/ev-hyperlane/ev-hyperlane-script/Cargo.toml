@@ -23,9 +23,9 @@ clap = { version = "4.0", features = ["cargo", "derive", "env"] }
 dirs = { workspace = true }
 ev-zkevm-types = { workspace = true }
 sp1-sdk = { workspace = true }
-zkevm-storage = { workspace = true }
 tokio = { workspace = true }
 url = { version = "2.5", default-features = false }
+zkevm-storage = { workspace = true }
 
 [build-dependencies]
 sp1-build = "5.2.1"
