@@ -26,7 +26,7 @@ use celestia_grpc_client::{
 };
 use core::panic;
 use ev_zkevm_types::{
-    hyperlane::encode_hyperlane_message,
+    hyperlane::{decode_hyperlane_message, encode_hyperlane_message},
     programs::hyperlane::types::{
         HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs,
         HyperlaneMessageInputs,
@@ -211,7 +211,7 @@ impl SP1HeliosOperator {
         let (_, helios_vk) = self.prover_client.setup(LIGHTCLIENT_ELF);
         let (_, wrapper_vk) = self.prover_client.setup(WRAPPER_ELF);
         let (hyperlane_pk, hyperlane_vk) = self.prover_client.setup(EV_HYPERLANE_ELF);
-        let ism_client = CelestiaIsmClient::new(ClientConfig::from_env()?).await?;
+        let ism_client = Arc::new(CelestiaIsmClient::new(ClientConfig::from_env()?).await?);
 
         info!("Starting service...");
         let mut active_trusted_state: Option<TrustedState> = None;
@@ -301,7 +301,7 @@ impl SP1HeliosOperator {
                         info!("Created ISM with id: {:?}", response.response.id);
 
                         // initialize hyperlane contracts
-                        self.hyperlane_init().await?;
+                        self.hyperlane_init(ism_client.clone()).await?;
 
                         // udpate trusted state
                         trusted_head = initial_trusted_state.new_head;
@@ -493,9 +493,16 @@ impl SP1HeliosOperator {
 
             // relay messages to hyperlane remote router
             for message in messages.clone() {
+                let message_decoded = decode_hyperlane_message(&message.message.body).unwrap();
+                // skip messages that are not destined for the ISM
+                if message_decoded.destination != 69420 {
+                    continue;
+                }
                 let message_hex = alloy::hex::encode(encode_hyperlane_message(&message.message)?);
                 let msg = MsgProcessMessage::new(
-                    self.config.mailbox_address.clone(),
+                    // mailbox id on Celestia
+                    "0x68797065726c616e650000000000000000000000000000000000000000000000"
+                        .to_string(),
                     ism_client.signer_address().to_string(),
                     // empty metadata; messages are pre-authorized before submission
                     alloy::hex::encode(vec![]),
@@ -514,6 +521,7 @@ impl SP1HeliosOperator {
                         "Failed to relay Hyperlane message to Celestia"
                     ));
                 }
+
                 info!(
                     "Successfully submitted Hyperlane message with id {} to Celestia",
                     message.message.id()
@@ -522,12 +530,11 @@ impl SP1HeliosOperator {
         }
     }
 
-    async fn hyperlane_init(&self) -> Result<()> {
+    async fn hyperlane_init(&self, ism_client: Arc<CelestiaIsmClient>) -> Result<()> {
         // first step: create the mailbox
         // second step: deploy the warp token
         // third step: set the ISM on the warp token
         // fourth step: enroll the remote router
-        let ism_client = CelestiaIsmClient::new(ClientConfig::from_env()?).await?;
 
         let create_noop_hook_message = MsgCreateNoopHook {
             owner: ism_client.signer_address().to_string(),
