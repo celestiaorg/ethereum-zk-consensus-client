@@ -48,6 +48,7 @@ mod tests {
             creator: ism_client.signer_address().to_string(),
             state: initial_trusted_state_bytes,
             groth16_vkey: GROTH16_VK.to_vec(),
+            merkle_tree_address: Vec::new(),
             state_transition_vkey: vk.bytes32_raw().to_vec(),
             // todo: replace with actual state membership vkey
             state_membership_vkey: vk.bytes32_raw().to_vec(),

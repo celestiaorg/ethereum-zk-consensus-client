@@ -7,6 +7,7 @@ use alloy_primitives::{Address, FixedBytes};
 use anyhow::Result;
 use celestia_grpc_client::{
     CelestiaIsmClient, MsgCreateSyntheticTokenResponse, MsgProcessMessage, MsgSubmitMessages,
+    MsgSubmitMessagesResponse,
     proto::{
         celestia::zkism::v1::{
             MsgCreateInterchainSecurityModule, MsgCreateInterchainSecurityModuleResponse,
@@ -14,7 +15,7 @@ use celestia_grpc_client::{
             MsgUpdateInterchainSecurityModuleResponse, QueryIsmRequest,
         },
         hyperlane::{
-            core::v1::{MsgCreateMailbox, MsgCreateMailboxResponse, MsgProcessMessageResponse},
+            core::v1::{MsgCreateMailbox, MsgCreateMailboxResponse},
             warp::v1::{MsgCreateSyntheticToken, MsgEnrollRemoteRouter, MsgSetToken, RemoteRouter},
         },
     },
@@ -210,7 +211,7 @@ impl SP1HeliosOperator {
 
         let verifier_response = ism_client
             .verifier(QueryIsmRequest {
-                id: self.config.verifier_id().to_string(),
+                id: ism_client.ism_id().to_string(),
             })
             .await;
 
@@ -276,6 +277,12 @@ impl SP1HeliosOperator {
                             creator: ism_client.signer_address().to_string(),
                             state: initial_trusted_state_bytes,
                             groth16_vkey: GROTH16_VK.to_vec(),
+                            merkle_tree_address: Address::from_str(
+                                &self.config.merkle_tree_address,
+                            )
+                            .unwrap()
+                            .into_word()
+                            .to_vec(),
                             state_transition_vkey: wrapper_vk.vk.bytes32_raw().to_vec(),
                             // todo: replace with actual state membership vkey
                             state_membership_vkey: hyperlane_vk.vk.bytes32_raw().to_vec(),
@@ -346,7 +353,7 @@ impl SP1HeliosOperator {
                         )?;
                         info!("Elapsed: {:?}", start_time.elapsed().as_millis());
                         let update_message = MsgUpdateInterchainSecurityModule {
-                            id: self.config.verifier_id().to_string(),
+                            id: ism_client.ism_id().to_string(),
                             proof: proof.bytes(),
                             public_values: proof.public_values.to_vec(),
                             signer: ism_client.signer_address().to_string(),
@@ -365,7 +372,7 @@ impl SP1HeliosOperator {
 
                         let verifier_response = ism_client
                             .verifier(QueryIsmRequest {
-                                id: self.config.verifier_id().to_string(),
+                                id: ism_client.ism_id().to_string(),
                             })
                             .await
                             .unwrap();
@@ -452,8 +459,7 @@ impl SP1HeliosOperator {
             // submit proof to ZKISM verifier
             // Prepare the proof submission message
             let message_proof_msg = MsgSubmitMessages::new(
-                self.config.verifier_id().to_string(),
-                trusted_head,
+                ism_client.ism_id().to_string(),
                 proof.bytes(),
                 proof.public_values.to_vec(),
                 ism_client.signer_address().to_string(),
@@ -461,8 +467,10 @@ impl SP1HeliosOperator {
 
             // Submit the proof to ZKISM
             info!("Submitting Hyperlane tree proof to ZKISM...");
-            let response = ism_client.send_tx(message_proof_msg).await?;
-            if !response.success {
+            let response = ism_client
+                .send_tx_typed::<_, MsgSubmitMessagesResponse>(message_proof_msg)
+                .await?;
+            if !response.tx.success {
                 error!(
                     "Failed to submit Hyperlane tree proof to ZKISM: {:?}",
                     response
@@ -471,6 +479,7 @@ impl SP1HeliosOperator {
                     "Failed to submit Hyperlane tree proof to ZKISM"
                 ));
             }
+            println!("Verified messages: {:?}", response.response.messages);
 
             // update snapshot
             let mut new_snapshot = snapshot.clone();
@@ -486,6 +495,7 @@ impl SP1HeliosOperator {
                 if message.message.destination != 69420 {
                     continue;
                 }
+                println!("Relaying message: {:?}", message.message);
                 let message_hex = alloy::hex::encode(encode_hyperlane_message(&message.message)?);
                 let msg = MsgProcessMessage::new(
                     // mailbox id on Celestia
@@ -497,10 +507,8 @@ impl SP1HeliosOperator {
                     message_hex,
                 );
 
-                let response = ism_client
-                    .send_tx_typed::<_, MsgProcessMessageResponse>(msg)
-                    .await?;
-                if !response.tx.success {
+                let response = ism_client.send_tx(msg).await?;
+                if !response.success {
                     error!(
                         "Failed to relay Hyperlane message to Celestia: {:?}",
                         response
@@ -546,7 +554,7 @@ impl SP1HeliosOperator {
         let mailbox_create_message = MsgCreateMailbox {
             owner: ism_client.signer_address().to_string(),
             local_domain: 69420,
-            default_ism: self.config.verifier_id().to_string(),
+            default_ism: ism_client.ism_id().to_string(),
             default_hook: create_noop_hook_response.response.id.clone(),
             required_hook: create_noop_hook_response.response.id,
         };
@@ -582,7 +590,7 @@ impl SP1HeliosOperator {
             owner: ism_client.signer_address().to_string(),
             token_id: synthetic_token_id.clone(),
             new_owner: ism_client.signer_address().to_string(),
-            ism_id: self.config.verifier_id().to_string(),
+            ism_id: ism_client.ism_id().to_string(),
             renounce_ownership: false,
         };
 
