@@ -60,6 +60,8 @@ const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
 const LIGHTCLIENT_ELF: &[u8] = include_bytes!("../../../elfs/helios");
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
 
+const DEFAULT_TIMEOUT: u64 = 600;
+
 pub type SP1Prover = dyn Prover<CpuProverComponents>;
 
 pub struct SP1HeliosOperator {
@@ -417,6 +419,8 @@ impl SP1HeliosOperator {
 
             if messages.is_empty() {
                 info!("No new messages found");
+                // sleep for 10 minutes
+                tokio::time::sleep(Duration::from_secs(DEFAULT_TIMEOUT)).await;
                 continue;
             }
 
@@ -521,6 +525,8 @@ impl SP1HeliosOperator {
                     message.message.id()
                 );
             }
+            // sleep for 10 minutes
+            tokio::time::sleep(Duration::from_secs(DEFAULT_TIMEOUT)).await;
         }
     }
 
