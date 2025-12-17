@@ -15,14 +15,14 @@ use celestia_grpc_client::{
         },
         hyperlane::{
             core::v1::{MsgCreateMailbox, MsgCreateMailboxResponse, MsgProcessMessageResponse},
-            warp::v1::{MsgCreateSyntheticToken, MsgEnrollRemoteRouter, RemoteRouter},
+            warp::v1::{MsgCreateSyntheticToken, MsgEnrollRemoteRouter, MsgSetToken, RemoteRouter},
         },
     },
     types::ClientConfig,
 };
 use core::panic;
 use ev_zkevm_types::{
-    hyperlane::{decode_hyperlane_message, encode_hyperlane_message},
+    hyperlane::encode_hyperlane_message,
     programs::hyperlane::types::{
         HYPERLANE_MERKLE_TREE_KEYS, HyperlaneBranchProof, HyperlaneBranchProofInputs,
         HyperlaneMessageInputs,
@@ -82,14 +82,9 @@ impl SP1HeliosOperator {
 
         // Check if contract is up to date
         let latest_block = finality_update.finalized_header().beacon().slot;
+        let latest_block = latest_block - (latest_block % 32);
         if latest_block <= head {
             info!("Contract is up to date. Nothing to update.");
-            tokio::time::sleep(Duration::from_secs(10)).await;
-            return Ok(None);
-        } else if !latest_block.is_multiple_of(32) {
-            error!(
-                "Attempted to commit to a non-checkpoint slot: {latest_block}. Skipping update."
-            );
             tokio::time::sleep(Duration::from_secs(10)).await;
             return Ok(None);
         }
@@ -487,9 +482,8 @@ impl SP1HeliosOperator {
 
             // relay messages to hyperlane remote router
             for message in messages.clone() {
-                let message_decoded = decode_hyperlane_message(&message.message.body).unwrap();
                 // skip messages that are not destined for the ISM
-                if message_decoded.destination != 69420 {
+                if message.message.destination != 69420 {
                     continue;
                 }
                 let message_hex = alloy::hex::encode(encode_hyperlane_message(&message.message)?);
@@ -511,9 +505,7 @@ impl SP1HeliosOperator {
                         "Failed to relay Hyperlane message to Celestia: {:?}",
                         response
                     );
-                    return Err(anyhow::anyhow!(
-                        "Failed to relay Hyperlane message to Celestia"
-                    ));
+                    continue;
                 }
 
                 info!(
@@ -584,18 +576,36 @@ impl SP1HeliosOperator {
             return Err(anyhow::anyhow!("Failed to create synthetic token"));
         }
 
-        info!(
-            "Created synthetic token with id: {}",
-            synthetic_token_response.response.id
-        );
+        let synthetic_token_id = synthetic_token_response.response.id;
+
+        let set_synthetic_token_ism_message = MsgSetToken {
+            owner: ism_client.signer_address().to_string(),
+            token_id: synthetic_token_id.clone(),
+            new_owner: ism_client.signer_address().to_string(),
+            ism_id: self.config.verifier_id().to_string(),
+            renounce_ownership: false,
+        };
+
+        let set_synthetic_token_ism_response =
+            ism_client.send_tx(set_synthetic_token_ism_message).await?;
+        if !set_synthetic_token_ism_response.success {
+            error!(
+                "Failed to set synthetic token ISM: {:?}",
+                set_synthetic_token_ism_response
+            );
+            return Err(anyhow::anyhow!("Failed to set synthetic token ISM"));
+        }
+
+        info!("Created synthetic token with id: {}", &synthetic_token_id);
 
         let remote_router_enroll_message = MsgEnrollRemoteRouter {
             owner: ism_client.signer_address().to_string(),
-            token_id: synthetic_token_response.response.id,
+            token_id: synthetic_token_id.clone(),
             remote_router: Some(RemoteRouter {
                 receiver_domain: 11155111,
                 // the token contract on Ethereum
-                receiver_contract: "0x0a7c0F5db1f662Ce262f7d2Dcf319CE63df44e12".to_string(),
+                receiver_contract:
+                    "0x0000000000000000000000000a7c0F5db1f662Ce262f7d2Dcf319CE63df44e12".to_string(),
                 gas: "0".to_string(),
             }),
         };
@@ -621,3 +631,7 @@ async fn main() {
     info!("Starting service...");
     operator.run().await.unwrap();
 }
+
+/*
+cast send 0x0a7c0F5db1f662Ce262f7d2Dcf319CE63df44e12   "enrollRemoteRouter(uint32,bytes32)"   69420   0x726f757465725f61707000000000000000000000000000010000000000000000   --private-key 52d441beb407f47811a09ed9d330320b2d336482512f26e9a5c5d3dacddc7b1e   --rpc-url https://ethereum-sepolia-rpc.publicnode.com
+*/
