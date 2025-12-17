@@ -7,7 +7,6 @@ use alloy_primitives::{Address, FixedBytes};
 use anyhow::Result;
 use celestia_grpc_client::{
     CelestiaIsmClient, MsgCreateSyntheticTokenResponse, MsgProcessMessage, MsgSubmitMessages,
-    MsgSubmitMessagesResponse,
     proto::{
         celestia::zkism::v1::{
             MsgCreateInterchainSecurityModule, MsgCreateInterchainSecurityModuleResponse,
@@ -16,10 +15,7 @@ use celestia_grpc_client::{
         },
         hyperlane::{
             core::v1::{MsgCreateMailbox, MsgCreateMailboxResponse, MsgProcessMessageResponse},
-            warp::v1::{
-                MsgCreateSyntheticToken, MsgEnrollRemoteRouter, MsgEnrollRemoteRouterResponse,
-                RemoteRouter,
-            },
+            warp::v1::{MsgCreateSyntheticToken, MsgEnrollRemoteRouter, RemoteRouter},
         },
     },
     types::ClientConfig,
