@@ -470,10 +470,8 @@ impl SP1HeliosOperator {
 
             // Submit the proof to ZKISM
             info!("Submitting Hyperlane tree proof to ZKISM...");
-            let response = ism_client
-                .send_tx_typed::<_, MsgSubmitMessagesResponse>(message_proof_msg)
-                .await?;
-            if !response.tx.success {
+            let response = ism_client.send_tx(message_proof_msg).await?;
+            if !response.success {
                 error!(
                     "Failed to submit Hyperlane tree proof to ZKISM: {:?}",
                     response
