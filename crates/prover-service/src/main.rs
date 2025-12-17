@@ -242,9 +242,6 @@ impl SP1HeliosOperator {
         let mut indexer_height = 9000000;
         let mut trusted_execution_block_number = 1;
 
-        // initialize hyperlane contracts
-        //self.hyperlane_init().await?;
-
         /////////////////////
         //// Prover Loop ////
         /////////////////////
@@ -302,7 +299,9 @@ impl SP1HeliosOperator {
                             return Err(anyhow::anyhow!("Failed to create ISM"));
                         }
                         info!("Created ISM with id: {:?}", response.response.id);
-                        info!("Transaction submitted: {:?}", response);
+
+                        // initialize hyperlane contracts
+                        self.hyperlane_init().await?;
 
                         // udpate trusted state
                         trusted_head = initial_trusted_state.new_head;
@@ -559,9 +558,18 @@ impl SP1HeliosOperator {
             required_hook: create_noop_hook_response.response.id,
         };
 
+        let resp = ism_client
+            .send_tx_typed::<_, MsgCreateMailboxResponse>(mailbox_create_message)
+            .await?;
+
+        if !resp.tx.success {
+            error!("Failed to create mailbox: {:?}", resp);
+            return Err(anyhow::anyhow!("Failed to create mailbox"));
+        }
+
         let synthetic_token_create_message = MsgCreateSyntheticToken {
-            owner: self.config.mailbox_address.clone(),
-            origin_mailbox: self.config.mailbox_address.clone(),
+            owner: ism_client.signer_address().to_string(),
+            origin_mailbox: resp.response.id,
         };
 
         let synthetic_token_response = ism_client
@@ -591,18 +599,8 @@ impl SP1HeliosOperator {
             }),
         };
 
-        let resp = ism_client
-            .send_tx_typed::<_, MsgCreateMailboxResponse>(mailbox_create_message)
-            .await?;
-        if !resp.tx.success {
-            error!("Failed to create mailbox: {:?}", resp);
-            return Err(anyhow::anyhow!("Failed to create mailbox"));
-        }
-
-        let resp = ism_client
-            .send_tx_typed::<_, MsgEnrollRemoteRouterResponse>(remote_router_enroll_message)
-            .await?;
-        if !resp.tx.success {
+        let resp = ism_client.send_tx(remote_router_enroll_message).await?;
+        if !resp.success {
             error!("Failed to enroll remote router: {:?}", resp);
             return Err(anyhow::anyhow!("Failed to enroll remote router"));
         }

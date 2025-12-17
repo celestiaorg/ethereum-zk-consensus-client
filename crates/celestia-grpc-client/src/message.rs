@@ -17,11 +17,6 @@ pub type StateTransitionProofMsg = MsgUpdateInterchainSecurityModule;
 pub type StateInclusionProofMsg = MsgSubmitMessages;
 pub type HyperlaneMessage = MsgProcessMessage;
 
-impl Name for MsgSetToken {
-    const NAME: &'static str = "MsgSetToken";
-    const PACKAGE: &'static str = "hyperlane.warp.v1";
-}
-
 impl Name for MsgCreateInterchainSecurityModule {
     const NAME: &'static str = "MsgCreateInterchainSecurityModule";
     const PACKAGE: &'static str = "celestia.zkism.v1";
@@ -133,5 +128,10 @@ impl Name for MsgCreateSyntheticToken {
 
 impl Name for MsgCreateNoopHook {
     const NAME: &'static str = "MsgCreateNoopHook";
-    const PACKAGE: &'static str = "hyperlane.core.v1";
+    const PACKAGE: &'static str = "hyperlane.core.post_dispatch.v1";
+}
+
+impl Name for MsgSetToken {
+    const NAME: &'static str = "MsgSetToken";
+    const PACKAGE: &'static str = "hyperlane.warp.v1";
 }
