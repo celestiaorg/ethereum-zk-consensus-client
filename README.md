@@ -4,7 +4,7 @@ The new branch has been merged into this [ZKISM branch](https://github.com/celes
 
 ## Motivation and Context
 In order for Celestia to become a hub for connecting all sorts of different chains, we must ensure the availability of trusted state roots.
-Each consensus model may require its own implementation of a consensus client, but it will practically always be a transition from previous_trusted_state to new_trusted_state.
+Each consensus model may require its own implementation of a consensus client, but it will practically always be a transition from `previous_trusted_state` to `new_trusted_state`.
 The `Verifier` module that was added to `celestia-app` for this POC allows anyone to deploy an on-chain verifier for SP1 Groth16 State Transition proofs, enabling Celestia
 to serve trusted roots for all kinds of different chains (Solana, Ethereum, L2s, ...).
 
@@ -45,7 +45,7 @@ Groth16 verifier directly. However it seems likely that most ZK light client tha
 
 ### Mock Circuit
 
-This POC uses a real SP1 ZK Program to simulate what a state transition may look like. However any Program that uses the same input and output will be supported as long as the correct verifying key is supplied during the instantiation of the module.
+The Mock Circuit uses a real SP1 ZK Program to simulate what a state transition may look like. However any Program that uses the same input and output will be supported as long as the correct verifying key is supplied during the instantiation of the module.
 
 
 Circuit code:
@@ -142,8 +142,8 @@ celestia-appd q zkism verifiers
 This will list all verifiers (should be one) and also show their trusted state.
 
 ### SP1 Helios Integration
-This repository contains a wrapper circuit and service that can be used to update the `trusted_state` in the Generic Verifier periodically.
-Generating Consensus proofs on CPUs takes a significant amount of time, so network mode is recommended even for testing.
+This repository contains a wrapper circuit and service that can be used to update the `trusted_state` in the Generic Verifier periodically. The Generic Verifier module was first introduced 
+in [this](https://github.com/celestiaorg/celestia-app/pull/6266) PR on `celestia-app` and has since been improved. Thanks to the generic design any state transition can be used in combination with Hyperlane message verification, using a custom ZKISM ([Interchain Security Module](https://docs.hyperlane.xyz/docs/protocol/ISM/modular-security)).
 
 The prover service will initially generate a raw Helios proof and instantiate the Verifier on Celesita from the proof outputs.
 Moving forward it will generate wrapped proofs using the circuit in `crates/circuit` to update the `trusted_state`, following the encoding rules
