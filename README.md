@@ -157,11 +157,12 @@ Proof outputs are structured such that `length_prefix` || `trusted_state` || `ne
 cargo run -p prover-service --release
 ```
 
-## Path to Mainnet
-If we want to support the integration of new consensus clients on Mainnet, then we might want to extend the verifier to also support Risc0 proof verification, such that we support the most common implementations of ZK Light Clients. We might be able to ditch versioning (which does introduce some risks, so needs discussion), or just add a Ric0 verifier implementation, that also wraps around the underlying Groth16 verifier.
+## Message Delivery
 
-Supporting generic Groth16 proofs should be straightforward, but needs discussion if we think it's a necessary addition.
-
-Since this branch of `celestia-app` is based off our ZKISM implementation and the generic StateTransitionVerifier was added to the ZKISM module, we might want to de-couple and launch just the StateTransitionVerifier on mainnet before introducing a ZKISM, with the goal of supporting ZK Light Client integrations like SP1 Helios.
-
-All of the above needs discussion.
+```mermaid
+    sequenceDiagram;
+        Client->>Module: submit MsgSubmitMessages where the public outputs of the state inclusion proof contain message IDs;
+        Module->>SP1 Verifier: Verify proof and insert messages into mapping;
+        Client->>Module: submit MsgProcessMessage for each message ID;
+        Module->>Module Storage: Verify and process messages and prune them from the message mapping;
+```
