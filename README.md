@@ -162,7 +162,8 @@ cargo run -p prover-service --release
 ```mermaid
     sequenceDiagram;
         Client->>Module: submit MsgSubmitMessages where the public outputs of the state inclusion proof contain message IDs;
-        Module->>SP1 Verifier: Verify proof and insert messages into mapping;
+        Module->>SP1 Verifier: Verify proof;
+        Module->>Global State: Insert verified message IDs into mapping;
         Client->>Module: submit MsgProcessMessage for each message ID;
-        Module->>Module Storage: Verify and process messages and prune them from the message mapping;
+        Module->>Global State: Verify and process messages and prune them from the message mapping;
 ```
