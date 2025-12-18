@@ -161,6 +161,7 @@ cargo run -p prover-service --release
 
 ```mermaid
     sequenceDiagram;
+        Circuit->>Client: generate a batched message inclusion proof against the hyperlane tree on the source chain;
         Client->>Module: submit MsgSubmitMessages where the public outputs of the state inclusion proof contain message IDs;
         Module->>SP1 Verifier: Verify proof;
         Module->>Global State: Insert verified message IDs into mapping;
