@@ -107,7 +107,7 @@ async fn main() {
 async fn write_proof_inputs(stdin: &mut SP1Stdin, args: &Args) -> Result<()> {
     let storage_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(".ev-prover")
+        .join(".hyp-zk-client")
         .join("data");
     let message_db =
         HyperlaneMessageStore::new(storage_path).expect("Failed to create message database");

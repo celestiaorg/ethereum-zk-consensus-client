@@ -91,6 +91,7 @@ pub struct GenesisState {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct QueryIsmRequest {
+    /// id is the hex-encoded ISM identifier.
     #[prost(string, tag="1")]
     pub id: ::prost::alloc::string::String,
 }
@@ -98,6 +99,7 @@ pub struct QueryIsmRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct QueryIsmResponse {
+    /// the ism associated with the provided identifier.
     #[prost(message, optional, tag="1")]
     pub ism: ::core::option::Option<InterchainSecurityModule>,
 }
@@ -116,6 +118,28 @@ pub struct QueryIsmsResponse {
     /// isms is a list of zk execution isms.
     #[prost(message, repeated, tag="1")]
     pub isms: ::prost::alloc::vec::Vec<InterchainSecurityModule>,
+    /// pagination defines the pagination in the response.
+    #[prost(message, optional, tag="2")]
+    pub pagination: ::core::option::Option<super::super::super::cosmos::base::query::v1beta1::PageResponse>,
+}
+/// QueryMessagesRequest is the request type for the Messages rpc method.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QueryMessagesRequest {
+    /// id is the hex-encoded ISM identifier.
+    #[prost(string, tag="1")]
+    pub id: ::prost::alloc::string::String,
+    /// pagination defines an optional pagination for the request.
+    #[prost(message, optional, tag="2")]
+    pub pagination: ::core::option::Option<super::super::super::cosmos::base::query::v1beta1::PageRequest>,
+}
+/// QueryMessagesResponse is the response type for the Messages rpc method.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QueryMessagesResponse {
+    /// messages is a list of authorized Hyperlane message IDs.
+    #[prost(string, repeated, tag="1")]
+    pub messages: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// pagination defines the pagination in the response.
     #[prost(message, optional, tag="2")]
     pub pagination: ::core::option::Option<super::super::super::cosmos::base::query::v1beta1::PageResponse>,

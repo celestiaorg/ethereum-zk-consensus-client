@@ -47,7 +47,7 @@ async fn test_index_sepolia() {
 
     let storage_path = dirs::home_dir()
         .expect("cannot find home directory")
-        .join(".ev-prover")
+        .join(".hyp-zk-client")
         .join("data");
 
     let hyperlane_message_store =
