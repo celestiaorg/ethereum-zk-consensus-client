@@ -165,5 +165,6 @@ cargo run -p prover-service --release
         Module->>SP1 Verifier: Verify proof;
         Module->>Global State: Insert verified message IDs into mapping;
         Client->>Module: submit MsgProcessMessage for each message ID;
-        Module->>Global State: Verify and process messages and prune them from the message mapping;
+        Module->>SP1 Verifier: Verify and process messages;
+        Module->>Global State: Prune processed message IDs from the mapping;
 ```
