@@ -53,7 +53,7 @@ async fn test_index_sepolia() {
     let hyperlane_message_store =
         Arc::new(HyperlaneMessageStore::new(storage_path.clone()).unwrap());
 
-    crate::hyperlane::index_sepolia(
+    super::indexer::index_sepolia(
         0,
         9853049,
         Address::from_str("0xC591542b7C43f1E79Df47526F7459Ed609Aff2a3").unwrap(),

@@ -51,7 +51,7 @@ use zkevm_storage::hyperlane::{
 };
 
 pub mod config;
-mod hyperlane;
+mod indexer;
 
 use config::ProverConfig;
 
@@ -59,8 +59,6 @@ pub const WRAPPER_ELF: &[u8] = include_elf!("sp1-helios");
 const GROTH16_VK: &[u8] = include_bytes!("../../../groth16_vk.bin");
 const LIGHTCLIENT_ELF: &[u8] = include_bytes!("../../../elfs/helios");
 pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
-
-const DEFAULT_TIMEOUT: u64 = 600;
 
 pub type SP1Prover = dyn Prover<CpuProverComponents>;
 
@@ -233,8 +231,8 @@ impl SP1HeliosOperator {
 
         let evm_provider = ProviderBuilder::new().connect_http(self.config.evm_rpc_url.parse()?);
 
-        let mut indexer_height = 9000000;
-        let mut trusted_execution_block_number = 1;
+        let mut indexer_height = self.config.indexer_execution_height();
+        let mut trusted_execution_block_number = self.config.trusted_execution_block_number();
 
         /////////////////////
         //// Prover Loop ////
@@ -402,7 +400,7 @@ impl SP1HeliosOperator {
                 indexer_height, trusted_execution_block_number
             );
 
-            hyperlane::index_sepolia(
+            indexer::index_sepolia(
                 indexer_height,
                 trusted_execution_block_number,
                 Address::from_str(&self.config.mailbox_address)?,
@@ -419,8 +417,7 @@ impl SP1HeliosOperator {
 
             if messages.is_empty() {
                 info!("No new messages found");
-                // sleep for 10 minutes
-                tokio::time::sleep(Duration::from_secs(DEFAULT_TIMEOUT)).await;
+                tokio::time::sleep(Duration::from_secs(self.config.timeout)).await;
                 continue;
             }
 
@@ -503,8 +500,7 @@ impl SP1HeliosOperator {
                 let message_hex = alloy::hex::encode(encode_hyperlane_message(&message.message)?);
                 let msg = MsgProcessMessage::new(
                     // mailbox id on Celestia
-                    "0x68797065726c616e650000000000000000000000000000000000000000000000"
-                        .to_string(),
+                    self.config.remote_mailbox_address().to_string(),
                     ism_client.signer_address().to_string(),
                     // empty metadata; messages are pre-authorized before submission
                     alloy::hex::encode(vec![]),
@@ -525,8 +521,7 @@ impl SP1HeliosOperator {
                     message.message.id()
                 );
             }
-            // sleep for 10 minutes
-            tokio::time::sleep(Duration::from_secs(DEFAULT_TIMEOUT)).await;
+            tokio::time::sleep(Duration::from_secs(self.config.timeout)).await;
         }
     }
 
@@ -616,10 +611,9 @@ impl SP1HeliosOperator {
             owner: ism_client.signer_address().to_string(),
             token_id: synthetic_token_id.clone(),
             remote_router: Some(RemoteRouter {
-                receiver_domain: 11155111,
+                receiver_domain: self.config.chain_id() as u32,
                 // the token contract on Ethereum
-                receiver_contract:
-                    "0x0000000000000000000000000a7c0F5db1f662Ce262f7d2Dcf319CE63df44e12".to_string(),
+                receiver_contract: self.config.ethereum_token_address().to_string(),
                 gas: "0".to_string(),
             }),
         };
