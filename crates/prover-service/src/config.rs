@@ -23,7 +23,7 @@ impl Default for ProverConfig {
             consensus_rpc_url: "https://ethereum-sepolia-beacon-api.publicnode.com".to_string(),
             evm_rpc_url: "https://ethereum-sepolia-rpc.publicnode.com".to_string(),
             chain_id: 11155111,
-            trusted_head: 9178624,
+            trusted_head: 9203360,
             indexer_execution_height: 9000000,
             trusted_execution_block_number: 0,
             mailbox_address: "0xC591542b7C43f1E79Df47526F7459Ed609Aff2a3".to_string(),

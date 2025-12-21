@@ -37,6 +37,7 @@ pub fn main() {
         new_trusted_state.previous_sync_committee_hash,
         trusted_state.sync_committee_hash
     );
+
     // assert that the previous head of the new trusted state is the same as the new head of the previous trusted state
     assert_eq!(new_trusted_state.previous_head, trusted_state.new_head);
     // assert that the previous header of the new trusted state is the same as the new header of the previous trusted state

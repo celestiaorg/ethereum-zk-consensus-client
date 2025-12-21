@@ -7,6 +7,8 @@ use ev_zkevm_types::events::Dispatch;
 use tracing::debug;
 use zkevm_storage::hyperlane::message::HyperlaneMessageStore;
 
+/// Helper function to index all Hyperlane messages from the mailbox event logs
+/// on Ethereum. Indexed messages will be stored in a local DB, prefixed by the block number.
 pub async fn index_sepolia(
     start_height: u64,
     end_height: u64,

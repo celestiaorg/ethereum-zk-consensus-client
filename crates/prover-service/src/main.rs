@@ -62,6 +62,7 @@ pub const EV_HYPERLANE_ELF: &[u8] = include_elf!("ev-hyperlane-program");
 
 pub type SP1Prover = dyn Prover<CpuProverComponents>;
 
+/// SP1 Helios operator that wraps the Helios ZK Program maintained by Succinct.
 pub struct SP1HeliosOperator {
     prover_client: Arc<SP1Prover>,
     lightclient_pk: Arc<SP1ProvingKey>,
@@ -153,7 +154,8 @@ impl SP1HeliosOperator {
         }
     }
 
-    /// Run a single iteration of the operator, possibly posting a new update on chain.
+    /// Run a single iteration of the Helios prover, possibly posting a new update on chain.
+    /// This does not wrap the proof in Groth16 and it also does not submit messages to the ZKISM.
     pub async fn run_once(&self) -> Result<()> {
         // Get the current slot from the contract
         let slot = self.config.trusted_head();
@@ -191,6 +193,8 @@ impl SP1HeliosOperator {
         Ok(())
     }
 
+    /// Run the wrapped Helios prover and generate Hyperlane message inclusion proofs.
+    /// This also submits messages to the ZKISM to update the trusted state and verify + process Hyperlane messages.
     pub async fn run(&self) -> Result<()> {
         let mut filter = EnvFilter::new(self.config.log_filter());
         if let Ok(env_filter) = std::env::var("RUST_LOG")
@@ -525,6 +529,9 @@ impl SP1HeliosOperator {
         }
     }
 
+    /// Initialize the Hyperlane core contracts on Celestia.
+    /// Also deploys the warp token and enrolls the remote router.
+    /// Deployment and enrollment on Ethereum is done using the Hyperlane CLI.
     async fn hyperlane_init(&self, ism_client: Arc<CelestiaIsmClient>) -> Result<()> {
         // first step: create the mailbox
         // second step: deploy the warp token
