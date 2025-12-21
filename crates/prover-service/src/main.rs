@@ -425,6 +425,31 @@ impl SP1HeliosOperator {
                 continue;
             }
 
+            // Track the starting height for this batch (used for recovery on failure)
+            let from_height = indexer_height;
+
+            // Check for pending (unfinalized) snapshots indicating a previous failure
+            if let Some((_pending_index, pending_snapshot)) = snapshot_store.get_pending_snapshot()? {
+                info!(
+                    "Found pending snapshot at height {}, recovering from previous failure",
+                    pending_snapshot.height
+                );
+                // Re-index from the pending snapshot's height to ensure we have all messages
+                indexer::index_sepolia(
+                    pending_snapshot.height,
+                    trusted_execution_block_number,
+                    Address::from_str(&self.config.mailbox_address)?,
+                    hyperlane_message_store.clone(),
+                    evm_provider.clone(),
+                )
+                .await?;
+                // Refresh messages after re-indexing
+                messages.clear();
+                for block in pending_snapshot.height..=trusted_execution_block_number {
+                    messages.extend(hyperlane_message_store.get_by_block(block)?);
+                }
+            }
+
             let keys: Vec<FixedBytes<32>> = HYPERLANE_MERKLE_TREE_KEYS
                 .iter()
                 .map(|k| {
@@ -480,19 +505,35 @@ impl SP1HeliosOperator {
                     "Failed to submit Hyperlane tree proof to ZKISM: {:?}",
                     response
                 );
-                return Err(anyhow::anyhow!(
-                    "Failed to submit Hyperlane tree proof to ZKISM"
-                ));
+                // Instead of returning error, create a pending snapshot for recovery
+                // The next iteration will detect this and re-index from from_height
+                let mut pending_snapshot = snapshot.clone();
+                pending_snapshot.height = from_height;
+                snapshot_store.insert_snapshot(snapshot_store.current_index()? + 1, pending_snapshot)?;
+                error!(
+                    "Created pending snapshot at height {} for recovery. Will retry in next iteration.",
+                    from_height
+                );
+                tokio::time::sleep(Duration::from_secs(self.config.timeout)).await;
+                continue;
             }
-            println!("Verified messages: {:?}", response.response.messages);
+            info!("Verified messages: {:?}", response.response.messages);
 
-            // update snapshot
+            // Update snapshot and mark as finalized on successful submission
             let mut new_snapshot = snapshot.clone();
+            new_snapshot.height = trusted_execution_block_number;
             for message in messages.clone() {
                 new_snapshot.tree.insert(message.message.id())?;
             }
-            snapshot_store.insert_snapshot(snapshot_store.current_index()? + 1, new_snapshot)?;
+            let new_index = snapshot_store.current_index()? + 1;
+            snapshot_store.insert_snapshot(new_index, new_snapshot)?;
+            // Finalize the snapshot to indicate successful submission
+            snapshot_store.finalize_snapshot(new_index)?;
             indexer_height = trusted_execution_block_number + 1;
+            info!(
+                "Successfully finalized snapshot at index {} with height {}",
+                new_index, trusted_execution_block_number
+            );
 
             // relay messages to hyperlane remote router
             for message in messages.clone() {
